@@ -8,7 +8,7 @@
 !/web/
 
 # Ngoại trừ các file sau
-!/HUONG_DAN_SU_DUNG.md
+!/README.md
 !/.gitignore
 
 node_modules/
