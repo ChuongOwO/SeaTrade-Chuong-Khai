@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import io from 'socket.io-client';
 import Navbar from './components/Navbar';
 import AdminDashboard from './components/AdminDashboard';
 import MobileAppSimulator from './components/MobileAppSimulator';
@@ -15,6 +16,59 @@ export default function App() {
   const [vessels, setVessels] = useState(INITIAL_VESSELS);
   const [orders, setOrders] = useState(INITIAL_ORDERS);
   const [offlineMode, setOfflineMode] = useState(false);
+
+  useEffect(() => {
+    // Kết nối tới Socket.IO Server Backend
+    const socket = io('http://localhost:5000');
+    
+    socket.on('connect', () => {
+      console.log('📡 [Web] Đã kết nối Radar Server');
+    });
+
+    socket.on('vessel_location_update', (data) => {
+      // Map data từ Simulator về cấu trúc vessel của Web
+      // Simulator data: { vesselId, jobType, lat, lng, heading, speed, timestamp }
+      
+      setVessels(prevVessels => {
+        const existingIdx = prevVessels.findIndex(v => v.code === data.vesselId);
+        
+        if (existingIdx >= 0) {
+          // Cập nhật vị trí tàu cũ
+          const updated = [...prevVessels];
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            lat: data.lat,
+            lng: data.lng,
+            speedKnots: data.speed,
+            lastSeen: data.timestamp
+          };
+          return updated;
+        } else {
+          // Thêm tàu mới chưa từng có trên bản đồ
+          const newVessel = {
+            id: prevVessels.length > 0 ? Math.max(...prevVessels.map(v => v.id)) + 1 : 1,
+            code: data.vesselId,
+            name: `Tàu ${data.jobType}`,
+            captain: 'Thuyền trưởng Ảo',
+            phone: '0900000000',
+            type: data.jobType === 'Thu gom' ? 'collector' : 'fishing', // Chuyển đổi loại
+            lat: data.lat,
+            lng: data.lng,
+            homePort: 'Cảng Cát Lở',
+            speedKnots: data.speed,
+            batteryPercent: Math.floor(Math.random() * 50) + 50,
+            status: 'at-sea',
+            lastSeen: data.timestamp
+          };
+          return [...prevVessels, newVessel];
+        }
+      });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   return (
     <div className="app-shell min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-sky-500 selection:text-white">
