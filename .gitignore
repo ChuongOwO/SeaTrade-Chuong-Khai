@@ -1,17 +1,48 @@
+# 1. Chặn toàn bộ bên ngoài thư mục gốc
 /*
 
-# Ngoại trừ các thư mục sau
+# 2. Ngoại trừ các thư mục source code
 !/ai-service/
 !/back-end/
 !/mobile/
 !/test/
 !/web/
 
-# Ngoại trừ các file sau
+# 3. Ngoại trừ các file tài liệu và cấu hình gốc
 !/HUONG_DAN_SU_DUNG.md
 !/.gitignore
+!/README.md
 
+# ---------------------------------------------
+# Common / Shared ignores (áp dụng cho toàn dự án)
+# ---------------------------------------------
 node_modules/
 dist/
 build/
-.env
+web-build/
+.env*
+!.env.example
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+*.tsbuildinfo
+
+# ---------------------------------------------
+# Mobile & Expo specifics
+# ---------------------------------------------
+.expo/
+expo-env.d.ts
+.metro-health-check*
+
+# Native build artifacts & keys
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+/mobile/ios/
+/mobile/android/
