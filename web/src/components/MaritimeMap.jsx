@@ -60,59 +60,40 @@ export default function MaritimeMap({ vessels, posts, orders }) {
   return (
     <div className="page-section">
 
-      {/* Header Banner */}
-      <div className="page-header">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
-          <div>
-            <div className="flex flex-wrap items-center gap-2.5 mb-2">
-              <span className="badge badge-cyan">Hệ Thống Định Vị Vùng Biển Realtime</span>
-              <span className="text-sm text-slate-500 font-mono">Bản Đồ Số Hàng Hải Việt Nam</span>
-            </div>
-            <h2 className="page-header-title flex items-center gap-2.5">
-              <Navigation className="w-7 h-7 text-sky-600" /> Bản Đồ Hải Trình & Chỉ Đường Tọa Độ GPS
-            </h2>
-            <p className="page-header-desc">
-              Xác định chính xác kinh độ, vĩ độ của các tàu đánh bắt và tàu thu gom ngoài khơi, tự động tính khoảng cách hải lý (NM), nhiên liệu tiêu thụ và hỗ trợ chỉ đường theo vector tọa độ GPS.
-            </p>
-          </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setFilterType('ALL')}
-              className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${filterType === 'ALL' ? 'bg-sky-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-            >
-              Tất cả ({vessels.length})
-            </button>
-            <button
-              onClick={() => setFilterType('FISHING')}
-              className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${filterType === 'FISHING' ? 'bg-sky-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-            >
-              ⛵ Tàu đánh bắt
-            </button>
-            <button
-              onClick={() => setFilterType('COLLECTOR')}
-              className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${filterType === 'COLLECTOR' ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-            >
-              🛥️ Tàu thu gom
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-v">
 
         {/* Interactive Sea Radar Map Screen */}
         <div className="lg:col-span-2 glass-panel stack-v">
-          <div className="section-divider">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 section-divider">
             <div className="flex flex-wrap items-center gap-2.5 text-sm font-mono">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
               <span className="text-slate-700 font-semibold">Vùng biển Vũng Tàu - Cát Lở - Nam Bộ</span>
-              <span className="text-slate-300">•</span>
-              <span className="text-sky-600">10.15°N - 10.40°N | 107.00°E - 107.25°E</span>
+              <span className="text-slate-300 hidden sm:inline">•</span>
+              <span className="text-sky-600 hidden sm:inline">10.15°N - 10.40°N | 107.00°E - 107.25°E</span>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setFilterType('ALL')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterType === 'ALL' ? 'bg-sky-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              >
+                Tất cả ({vessels.length})
+              </button>
+              <button
+                onClick={() => setFilterType('FISHING')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterType === 'FISHING' ? 'bg-sky-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              >
+                ⛵ Tàu đánh bắt
+              </button>
+              <button
+                onClick={() => setFilterType('COLLECTOR')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterType === 'COLLECTOR' ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              >
+                🛥️ Tàu thu gom
+              </button>
             </div>
           </div>
 

@@ -14,21 +14,7 @@ export default function AnalyticsView({ posts, orders }) {
   return (
     <div className="page-section">
       
-      {/* Header Banner */}
-      <div className="page-header">
-        <div className="relative z-10">
-          <div className="flex flex-wrap items-center gap-2.5 mb-2">
-            <span className="badge badge-cyan">Thống Kê Thủy Sản & Hiệu Quả Giao Thương</span>
-            <span className="text-sm text-slate-500 font-mono">Báo Cáo Sản Lượng Khai Thác Năm 2026</span>
-          </div>
-          <h2 className="page-header-title flex items-center gap-2.5">
-            <BarChart3 className="w-7 h-7 text-emerald-600" /> Báo Cáo Sản Lượng & Tiết Kiệm Nhiên Liệu
-          </h2>
-          <p className="page-header-desc">
-            Tổng hợp dữ liệu giao thương hải sản thu gom tại khơi, cắt giảm khâu trung gian, giảm chi phí chạy tàu quay về cảng — gia tăng 25–30% thu nhập thực tế cho ngư dân.
-          </p>
-        </div>
-      </div>
+
 
       {/* Analytics KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-v">

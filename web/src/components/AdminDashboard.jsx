@@ -40,30 +40,7 @@ export default function AdminDashboard({ posts, setPosts, vessels, orders }) {
   return (
     <div className="page-section">
       
-      {/* Top Header Banner */}
-      <div className="page-header">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
-          <div>
-            <div className="flex flex-wrap items-center gap-2.5 mb-2">
-              <span className="badge badge-cyan">Ban Quản Lý & Điều Hành Giao Thương</span>
-              <span className="text-sm text-slate-500 font-mono">Trạm Giám Sát Cảng Cá Vũng Tàu - Nam Bộ</span>
-            </div>
-            <h2 className="page-header-title">
-              Bảng Điều Khiển Web Admin SeaTrade AI
-            </h2>
-            <p className="page-header-desc">
-              Giám sát sản lượng đánh bắt ven biển real-time, kiểm duyệt bài rao hải sản xác thực bằng AI Computer Vision, theo dõi hải trình tàu thuyền và hỗ trợ thương lái chốt đơn trực tiếp ngoài khơi.
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-3 shrink-0">
-            <button type="button" className="btn-export-report">
-              <FileText className="w-4 h-4 shrink-0" />
-              Xuất Báo Cáo (Excel/PDF)
-            </button>
-          </div>
-        </div>
-      </div>
+
 
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-v">
@@ -194,7 +171,7 @@ export default function AdminDashboard({ posts, setPosts, vessels, orders }) {
             </div>
 
             {/* Filter controls */}
-            <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               <div className="relative">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
@@ -202,21 +179,29 @@ export default function AdminDashboard({ posts, setPosts, vessels, orders }) {
                   placeholder="Tìm loài, số tàu..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="input-field input-search w-52"
+                  className="input-field input-search w-full sm:w-52"
                 />
               </div>
 
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="input-field"
-              >
-                <option value="ALL">Tất cả nhóm</option>
-                <option value="Fish">Cá đại dương</option>
-                <option value="Shrimp">Tôm hùm/Tôm biển</option>
-                <option value="Squid">Mực lá/Mực ống</option>
-                <option value="Crab">Cua/Ghẹ</option>
-              </select>
+              <div className="relative shrink-0">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Filter className="w-4 h-4 text-slate-400" />
+                </div>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="input-field input-select pl-9 pr-8 py-2.5 rounded-xl border-slate-200 bg-white shadow-sm font-medium text-slate-700 hover:border-sky-300 focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all appearance-none outline-none cursor-pointer text-sm"
+                >
+                  <option value="ALL">Tất cả bài rào</option>
+                  <option value="PREMIUM">Hải sản Cao cấp</option>
+                  <option value="COMMON">Hải sản Phổ thông</option>
+                </select>
+              </div>
+
+              <button type="button" className="btn-export-report px-3 py-2 h-10 flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-sm font-semibold hover:bg-sky-100 transition-colors shrink-0">
+                <FileText className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Xuất Báo Cáo</span>
+              </button>
             </div>
           </div>
 
