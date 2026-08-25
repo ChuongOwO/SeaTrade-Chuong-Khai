@@ -10,13 +10,13 @@ const register = async (req, res, next) => {
   try {
     // 1. Kiểm tra đầu vào cơ bản
     if (!phone || !password || !full_name) {
-      return res.status(400).json({ success: false, message: 'Vui lòng nhập đầy đủ Số điện thoại, Mật khẩu và Họ tên' });
+      return res.status(400).json({ status: 400, message: 'Vui lòng nhập đầy đủ Số điện thoại, Mật khẩu và Họ tên' });
     }
 
     // 2. Kiểm tra user đã tồn tại chưa
     const checkUser = await pool.query('SELECT id FROM users WHERE phone = $1', [phone]);
     if (checkUser.rows.length > 0) {
-      return res.status(409).json({ success: false, message: 'Số điện thoại này đã được đăng ký' });
+      return res.status(409).json({ status: 409, message: 'Số điện thoại này đã được đăng ký' });
     }
 
     // 3. Hash mật khẩu
@@ -45,9 +45,9 @@ const register = async (req, res, next) => {
     );
 
     res.status(201).json({
-      success: true,
+      status: 201,
       message: 'Đăng ký tài khoản thành công',
-      data: { user, token }
+      metadata: { user, token }
     });
 
   } catch (error) {
@@ -61,13 +61,13 @@ const login = async (req, res, next) => {
 
   try {
     if (!phone || !password) {
-      return res.status(400).json({ success: false, message: 'Vui lòng nhập số điện thoại và mật khẩu' });
+      return res.status(400).json({ status: 400, message: 'Vui lòng nhập số điện thoại và mật khẩu' });
     }
 
     // 1. Lấy thông tin user từ DB
     const userResult = await pool.query('SELECT * FROM users WHERE phone = $1', [phone]);
     if (userResult.rows.length === 0) {
-      return res.status(401).json({ success: false, message: 'Số điện thoại hoặc mật khẩu không đúng' });
+      return res.status(401).json({ status: 401, message: 'Số điện thoại hoặc mật khẩu không đúng' });
     }
 
     const user = userResult.rows[0];
@@ -75,12 +75,12 @@ const login = async (req, res, next) => {
     // 2. Kiểm tra mật khẩu
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Số điện thoại hoặc mật khẩu không đúng' });
+      return res.status(401).json({ status: 401, message: 'Số điện thoại hoặc mật khẩu không đúng' });
     }
 
     // 3. Kiểm tra trạng thái tài khoản
     if (user.status !== 'ACTIVE') {
-      return res.status(403).json({ success: false, message: 'Tài khoản của bạn đã bị vô hiệu hóa hoặc khóa' });
+      return res.status(403).json({ status: 403, message: 'Tài khoản của bạn đã bị vô hiệu hóa hoặc khóa' });
     }
 
     // 4. Tạo JWT Token
@@ -94,9 +94,9 @@ const login = async (req, res, next) => {
     delete user.password_hash;
 
     res.json({
-      success: true,
+      status: 200,
       message: 'Đăng nhập thành công',
-      data: { user, token }
+      metadata: { user, token }
     });
 
   } catch (error) {
@@ -116,12 +116,13 @@ const getMe = async (req, res, next) => {
     );
 
     if (userResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy thông tin người dùng' });
+      return res.status(404).json({ status: 404, message: 'Không tìm thấy thông tin người dùng' });
     }
 
     res.json({
-      success: true,
-      data: userResult.rows[0]
+      status: 200,
+      message: 'Lấy thông tin người dùng thành công',
+      metadata: userResult.rows[0]
     });
   } catch (error) {
     next(error);

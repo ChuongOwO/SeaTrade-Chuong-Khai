@@ -21,14 +21,16 @@ app.get('/api/health', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW()');
     res.json({
-      success: true,
+      status: 200,
       message: 'Seafood Trading API is running',
-      database: 'connected',
-      timestamp: result.rows[0].now
+      metadata: {
+        database: 'connected',
+        timestamp: result.rows[0].now
+      }
     });
   } catch (err) {
     res.status(500).json({
-      success: false,
+      status: 500,
       message: 'Seafood Trading API is running but Database connection failed',
       error: err.message
     });

@@ -5,9 +5,9 @@ const errorMiddleware = (err, req, res, next) => {
   const message = err.message || 'Lỗi hệ thống nội bộ máy chủ';
 
   res.status(statusCode).json({
-    success: false,
+    status: statusCode,
     message: message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    error: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
 };
 
