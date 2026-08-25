@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import Navbar from './components/Navbar';
+import LoginScreen from './components/LoginScreen';
 import AdminDashboard from './components/AdminDashboard';
+import OrderManagement from './components/OrderManagement';
+import FleetManagement from './components/FleetManagement';
 import MobileAppSimulator from './components/MobileAppSimulator';
 import AIVisionPlayground from './components/AIVisionPlayground';
 import MaritimeMap from './components/MaritimeMap';
@@ -11,7 +14,9 @@ import UserManual from './components/UserManual';
 import { INITIAL_POSTS, INITIAL_VESSELS, INITIAL_ORDERS } from './data/mockData';
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('admin');
+  const [activeRole, setActiveRole] = useState('FISHERMAN'); // vai trò trong Mobile App Simulator
   const [posts, setPosts] = useState(INITIAL_POSTS);
   const [vessels, setVessels] = useState(INITIAL_VESSELS);
   const [orders, setOrders] = useState(INITIAL_ORDERS);
@@ -70,35 +75,71 @@ export default function App() {
     };
   }, []);
 
+  const handleLogin = (user) => {
+    setCurrentUser(user);
+    setActiveTab(user.defaultTab);
+    if (user.mobileRole) setActiveRole(user.mobileRole);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setActiveTab('admin');
+  };
+
+  // Chưa đăng nhập -> chỉ hiện màn hình chọn vai trò, chưa vào được hệ thống
+  // (Đặt SAU các hook useState/useEffect ở trên để không phá quy tắc Rules of Hooks)
+  if (!currentUser) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
   return (
-    <div className="app-shell min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-sky-500 selection:text-white">
-      
-      <Navbar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+    <div className="app-shell app-layout bg-slate-50 text-slate-900 font-sans selection:bg-sky-500 selection:text-white">
+
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
         offlineMode={offlineMode}
         setOfflineMode={setOfflineMode}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
+      <div className="app-main">
       <main className="site-main flex-1 w-full site-container">
-        
+
         {activeTab === 'admin' && (
-          <AdminDashboard 
-            posts={posts} 
-            setPosts={setPosts} 
-            vessels={vessels} 
-            orders={orders} 
+          <AdminDashboard
+            posts={posts}
+            setPosts={setPosts}
+            vessels={vessels}
+            orders={orders}
+          />
+        )}
+
+        {activeTab === 'orders' && (
+          <OrderManagement
+            orders={orders}
+            setOrders={setOrders}
+          />
+        )}
+
+        {activeTab === 'fleet' && (
+          <FleetManagement
+            vessels={vessels}
+            setVessels={setVessels}
           />
         )}
 
         {activeTab === 'mobile' && (
-          <MobileAppSimulator 
-            posts={posts} 
-            setPosts={setPosts} 
-            vessels={vessels} 
+          <MobileAppSimulator
+            posts={posts}
+            setPosts={setPosts}
+            vessels={vessels}
             orders={orders}
             setOrders={setOrders}
             offlineMode={offlineMode}
+            activeRole={activeRole}
+            setActiveRole={setActiveRole}
           />
         )}
 
@@ -107,17 +148,18 @@ export default function App() {
         )}
 
         {activeTab === 'sea-map' && (
-          <MaritimeMap 
-            vessels={vessels} 
-            posts={posts} 
-            orders={orders} 
+          <MaritimeMap
+            vessels={vessels}
+            posts={posts}
+            orders={orders}
           />
         )}
 
         {activeTab === 'analytics' && (
-          <AnalyticsView 
-            posts={posts} 
-            orders={orders} 
+          <AnalyticsView
+            posts={posts}
+            orders={orders}
+            vessels={vessels}
           />
         )}
 
@@ -127,16 +169,13 @@ export default function App() {
 
       </main>
 
-      <footer className="site-footer mt-auto bg-white/80 backdrop-blur-md border-t border-slate-200/80 site-container text-sm text-slate-600 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
-        <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="leading-relaxed">
-            © 2026 <strong className="text-sky-600 font-semibold">SeaTrade AI</strong> — Nền tảng kết nối giao thương hải sản ven biển & phân loại bằng AI.
-          </p>
-          <p className="text-xs font-mono text-slate-500">
-            Đồ án tốt nghiệp CNTT • Trạm phát sóng GPS Vũng Tàu - Nam Bộ
-          </p>
+      <footer className="site-footer mt-auto bg-white border-t border-slate-200 site-container text-xs text-slate-500">
+        <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-2">
+          <p>© 2026 <strong className="text-slate-700 font-semibold">SeaTrade AI</strong> — Đồ án tốt nghiệp CNTT</p>
+          <p>Trạm phát sóng GPS Vũng Tàu - Nam Bộ</p>
         </div>
       </footer>
+      </div>
 
     </div>
   );

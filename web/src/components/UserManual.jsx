@@ -8,43 +8,93 @@ import {
 } from 'lucide-react';
 
 export default function UserManual() {
+  // Tạo và tải về bản Markdown của hướng dẫn sử dụng (nội dung khớp với
+  // các mục hiển thị bên dưới, thay vì chỉ alert() báo giả một file có sẵn)
+  const handleDownloadManual = () => {
+    const content = `# Hướng Dẫn Sử Dụng & Vận Hành Hệ Thống SeaTrade AI
+
+## 1. Tổng Quan Kiến Trúc Nền Tảng
+
+Hệ thống là giải pháp số hóa mô hình giao thương hải sản trực tiếp ngoài khơi
+giữa bên bán (Tàu đánh bắt/Ngư dân) và bên mua (Tàu thu gom/Thương lái).
+
+- **Web Admin Dashboard**: ReactJS + Vite. Giám sát hoạt động giao dịch, quản lý
+  danh mục hải sản, biến động giá thị trường và đội tàu.
+- **Mobile App (Simulator)**: Đa vai trò (Thuyền trưởng & Thương lái). Tích hợp
+  quét ảnh AI, bản đồ hải trình GPS, thỏa thuận đơn hàng & Offline Sync.
+- **Mô-đun AI Computer Vision**: Phân loại chủng loại hải sản, đánh giá độ tươi
+  và gợi ý giá.
+
+## 2. Quy Trình Dành Cho Thuyền Trưởng Tàu Đánh Bắt (Bên Bán)
+
+1. Bật định vị GPS, chọn chế độ "Thuyền Trưởng Tàu Đánh Bắt".
+2. Chụp ảnh quét AI khi vừa trúng mẻ lưới để nhận diện loài, đánh giá độ tươi
+   và gợi ý mức giá.
+3. Nhập sản lượng dự kiến và nhấn "Phát Sóng Rao Bán".
+4. Thỏa thuận & chốt đơn với tàu thu gom.
+5. Di chuyển giao nhận theo chỉ dẫn hải trình GPS.
+
+## 3. Quy Trình Dành Cho Tàu Thu Gom / Thương Lái (Bên Mua)
+
+1. Mở bản đồ rada hải trình để xem các tàu đánh bắt đang có hải sản gần đó.
+2. Lọc và xem chi tiết mặt hàng đã verified bằng AI.
+3. Gửi đề nghị mua và chốt đơn.
+4. Điều hướng GPS theo tọa độ biển đến vị trí giao hàng.
+
+## 4. Hướng Dẫn Cài Đặt & Chạy Mã Nguồn
+
+\`\`\`
+# 1. Web Dashboard & Mobile Simulator
+cd web
+npm install
+npm run dev
+
+# 2. AI Service (Python FastAPI + YOLOv8)
+cd ai-service
+pip install -r requirements.txt
+python main.py
+\`\`\`
+
+---
+Tài liệu được tạo tự động từ trang Hướng Dẫn của ứng dụng.
+`;
+
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'HUONG_DAN_SU_DUNG.md';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="page-section max-w-none w-full">
       
-      {/* Banner */}
-      <div className="page-header">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 relative z-10">
-          <div>
-            <div className="flex flex-wrap items-center gap-2.5 mb-2">
-              <span className="badge badge-cyan">Tài Liệu Đồ Án Tốt Nghiệp</span>
-              <span className="text-sm text-slate-500 font-mono">Hệ Thống SeaTrade AI</span>
-            </div>
-            <h2 className="page-header-title flex items-center gap-2.5">
-              <BookOpen className="w-7 h-7 text-sky-600" /> Hướng Dẫn Sử Dụng & Vận Hành Hệ Thống
-            </h2>
-            <p className="page-header-desc">
-              Tài liệu chi tiết hướng dẫn vận hành nền tảng giao thương hải sản ven biển kết hợp mô-đun phân loại AI và bản đồ hải trình GPS.
-            </p>
-          </div>
-
-          <a
-            href="#full-doc"
-            onClick={(e) => {
-              e.preventDefault();
-              alert('Tài liệu chi tiết HUONG_DAN_SU_DUNG.md đã được tạo trực tiếp tại thư mục gốc dự án!');
-            }}
-            className="px-5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shrink-0 shadow-sm"
-          >
-            <FileText className="w-4 h-4" /> Mở HUONG_DAN_SU_DUNG.md
-          </a>
+      <div className="page-header flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h2 className="page-header-title">Hướng Dẫn Sử Dụng & Vận Hành Hệ Thống</h2>
+          <p className="page-header-desc">
+            Tài liệu chi tiết hướng dẫn vận hành nền tảng giao thương hải sản ven biển kết hợp mô-đun phân loại AI và bản đồ hải trình GPS.
+          </p>
         </div>
+
+        <button
+          type="button"
+          onClick={handleDownloadManual}
+          className="btn btn-outline shrink-0"
+        >
+          <FileText className="w-4 h-4" /> Tải HUONG_DAN_SU_DUNG.md
+        </button>
       </div>
 
       {/* Guide Content Sections */}
       <div className="stack-v">
         
         {/* Section 1: Tổng Quan Kiến Trúc */}
-        <div className="glass-panel space-y-4 border-sky-200/60">
+        <div className="glass-panel space-y-4">
           <h3 className="section-title">
             <span className="w-7 h-7 rounded-full bg-sky-100 text-sky-700 text-sm flex items-center justify-center font-mono font-bold">1</span>
             Tổng Quan Kiến Trúc Nền Tảng SeaTrade AI
@@ -56,8 +106,8 @@ export default function UserManual() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-v pt-1">
             <div className="glass-card space-y-2">
-              <h4 className="font-bold text-sky-700 text-sm flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4" /> Web Admin Dashboard
+              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-sky-600" /> Web Admin Dashboard
               </h4>
               <p className="text-sm text-slate-600 leading-relaxed">
                 Xây dựng bằng ReactJS + Vite. Giám sát toàn bộ hoạt động giao dịch, quản lý danh mục hải sản, biến động giá thị trường và fleet tàu thuyền.
@@ -65,8 +115,8 @@ export default function UserManual() {
             </div>
 
             <div className="glass-card space-y-2">
-              <h4 className="font-bold text-emerald-700 text-sm flex items-center gap-2">
-                <Anchor className="w-4 h-4" /> Mobile App (Simulator)
+              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Anchor className="w-4 h-4 text-sky-600" /> Mobile App (Simulator)
               </h4>
               <p className="text-sm text-slate-600 leading-relaxed">
                 Đa vai trò (Thuyền trưởng & Thương lái). Tích hợp camera chụp ảnh quét AI, bản đồ hải trình GPS, thỏa thuận đơn hàng & Offline Sync.
@@ -74,8 +124,8 @@ export default function UserManual() {
             </div>
 
             <div className="glass-card space-y-2">
-              <h4 className="font-bold text-purple-700 text-sm flex items-center gap-2">
-                <Camera className="w-4 h-4" /> Mô-Đun AI Computer Vision
+              <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Camera className="w-4 h-4 text-sky-600" /> Mô-Đun AI Computer Vision
               </h4>
               <p className="text-sm text-slate-600 leading-relaxed">
                 Ứng dụng YOLOv8 & OpenCV tự động phân loại chủng loại (Cá ngừ, Cá thu, Tôm hùm, Mực, Cua), đánh giá độ tươi và tự động gợi ý giá.
@@ -85,9 +135,9 @@ export default function UserManual() {
         </div>
 
         {/* Section 2: Quy Trình Dành Cho Ngư Dân */}
-        <div className="glass-panel space-y-4 border-emerald-200/60">
+        <div className="glass-panel space-y-4">
           <h3 className="section-title">
-            <span className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 text-sm flex items-center justify-center font-mono font-bold">2</span>
+            <span className="w-7 h-7 rounded-full bg-sky-100 text-sky-700 text-sm flex items-center justify-center font-mono font-bold">2</span>
             Quy Trình Dành Cho Thuyền Trưởng Tàu Đánh Bắt (Bên Bán)
           </h3>
 
@@ -111,9 +161,9 @@ export default function UserManual() {
         </div>
 
         {/* Section 3: Quy Trình Dành Cho Thương Lái */}
-        <div className="glass-panel space-y-4 border-amber-200/60">
+        <div className="glass-panel space-y-4">
           <h3 className="section-title">
-            <span className="w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-sm flex items-center justify-center font-mono font-bold">3</span>
+            <span className="w-7 h-7 rounded-full bg-sky-100 text-sky-700 text-sm flex items-center justify-center font-mono font-bold">3</span>
             Quy Trình Dành Cho Tàu Thu Gom / Thương Lái (Bên Mua)
           </h3>
 
@@ -134,9 +184,9 @@ export default function UserManual() {
         </div>
 
         {/* Section 4: Hướng Dẫn Cài Đặt */}
-        <div className="glass-panel space-y-4 border-purple-200/60">
+        <div className="glass-panel space-y-4">
           <h3 className="section-title">
-            <span className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 text-sm flex items-center justify-center font-mono font-bold">4</span>
+            <span className="w-7 h-7 rounded-full bg-sky-100 text-sky-700 text-sm flex items-center justify-center font-mono font-bold">4</span>
             Hướng Dẫn Cài Đặt & Chạy Mã Nguồn Đồ Án
           </h3>
 
