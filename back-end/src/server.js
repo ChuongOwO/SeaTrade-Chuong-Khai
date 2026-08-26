@@ -6,6 +6,7 @@ const env = require('./config/env');
 const pool = require('./config/database');
 const errorMiddleware = require('./middleware/error.middleware');
 const authRoutes = require('./modules/auth/auth.routes');
+const vesselRoutes = require('./modules/vessels/vessel.routes');
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.get('/api/health', async (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/vessels', vesselRoutes);
 
 // Global Error Handler
 app.use(errorMiddleware);
