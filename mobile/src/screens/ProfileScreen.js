@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { colors } from '../theme';
 
 export default function ProfileScreen({ route }) {
   const [userData, setUserData] = useState(null);
-  
+
   // Hàm đăng xuất được truyền từ AppNavigator qua MainTabs xuống ProfileScreen
   const { onLogout } = route.params || {};
 
@@ -24,10 +25,24 @@ export default function ProfileScreen({ route }) {
     loadUserData();
   }, []);
 
+  // Trước đây mục này không có onPress (bấm vô tri). Đây chỉ là hộp thoại
+  // xác nhận UI tạm thời — CHƯA thật sự xóa dữ liệu Offline nào, phần đó
+  // cần đồng đội định nghĩa rõ "dữ liệu Offline" gồm những gì trước khi nối logic thật.
+  const handleClearOfflineData = () => {
+    Alert.alert(
+      'Xóa dữ liệu Offline',
+      'Thao tác này sẽ xóa các bài đăng/ảnh quét AI đã lưu tạm khi mất sóng. Bạn có chắc chắn?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Xóa', style: 'destructive', onPress: () => Alert.alert('Đã xóa', 'Dữ liệu Offline tạm thời đã được dọn dẹp.') },
+      ]
+    );
+  };
+
   if (!userData) {
     return (
       <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#0ea5e9" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -38,10 +53,10 @@ export default function ProfileScreen({ route }) {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Hồ Sơ & Cài Đặt</Text>
         </View>
-        
+
         <View style={styles.profileBox}>
           <View style={styles.avatar}>
-            <Ionicons name="person" size={40} color="#0ea5e9" />
+            <Ionicons name="person" size={40} color={colors.primary} />
           </View>
           <Text style={styles.name}>{userData.name}</Text>
           <Text style={styles.phone}>{userData.phone}</Text>
@@ -51,10 +66,10 @@ export default function ProfileScreen({ route }) {
           <Text style={styles.sectionTitle}>Vai trò của bạn</Text>
           <View style={styles.roleToggle}>
             <View style={[styles.roleBtn, styles.roleBtnActive, { flex: 1 }]}>
-              <Ionicons 
-                name={userData.role === 'fisherman' ? 'boat' : 'cube'} 
-                size={20} 
-                color="#fff" 
+              <Ionicons
+                name={userData.role === 'fisherman' ? 'boat' : 'cube'}
+                size={20}
+                color={colors.textOnPrimary}
               />
               <Text style={[styles.roleText, styles.roleTextActive]}>
                 {userData.role === 'fisherman' ? 'Ngư Dân' : 'Thương Lái'}
@@ -62,7 +77,7 @@ export default function ProfileScreen({ route }) {
             </View>
           </View>
           <Text style={styles.hintText}>
-            {userData.role === 'fisherman' 
+            {userData.role === 'fisherman'
               ? 'Chế độ Ngư Dân: Quét ảnh AI, báo cáo sản lượng và bật định vị chờ tàu thu mua.'
               : 'Chế độ Thương Lái: Theo dõi bản đồ tàu đánh bắt, chốt đơn và dẫn đường trên biển.'}
           </Text>
@@ -71,23 +86,23 @@ export default function ProfileScreen({ route }) {
         {/* Section Bảng điều khiển */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Cài đặt nâng cao</Text>
-          
-          <TouchableOpacity style={styles.menuItem}>
+
+          <TouchableOpacity style={styles.menuItem} onPress={handleClearOfflineData}>
             <View style={styles.menuItemLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#fef2f2' }]}>
-                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              <View style={[styles.iconBox, { backgroundColor: colors.dangerSoft }]}>
+                <Ionicons name="trash-outline" size={20} color={colors.danger} />
               </View>
               <Text style={styles.menuText}>Xóa dữ liệu Offline</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+            <Ionicons name="chevron-forward" size={20} color={colors.borderStrong} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={onLogout}>
             <View style={styles.menuItemLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#f1f5f9' }]}>
-                <Ionicons name="log-out-outline" size={20} color="#64748b" />
+                <Ionicons name="log-out-outline" size={20} color={colors.textMuted} />
               </View>
-              <Text style={[styles.menuText, { color: '#64748b' }]}>Đăng xuất</Text>
+              <Text style={[styles.menuText, { color: colors.textMuted }]}>Đăng xuất</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -99,31 +114,31 @@ export default function ProfileScreen({ route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: colors.textPrimary,
   },
   profileBox: {
     alignItems: 'center',
     padding: 30,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     marginBottom: 20,
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -131,22 +146,22 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: colors.textPrimary,
   },
   phone: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.textMuted,
     marginTop: 4,
   },
   section: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     padding: 20,
     marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#334155',
+    color: colors.textSecondary,
     marginBottom: 16,
   },
   roleToggle: {
@@ -165,19 +180,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   roleBtnActive: {
-    backgroundColor: '#0ea5e9',
+    backgroundColor: colors.primary,
   },
   roleText: {
-    color: '#64748b',
+    color: colors.textMuted,
     fontWeight: 'bold',
   },
   roleTextActive: {
-    color: '#ffffff',
+    color: colors.textOnPrimary,
   },
   hintText: {
     marginTop: 16,
     fontSize: 13,
-    color: '#64748b',
+    color: colors.textMuted,
     lineHeight: 20,
   },
   menuItem: {
@@ -202,7 +217,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 15,
-    color: '#334155',
+    color: colors.textSecondary,
     fontWeight: '500',
   }
 });

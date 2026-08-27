@@ -8,15 +8,10 @@
 !/test/
 !/web/
 
-<<<<<<< HEAD
-# Ngoại trừ các file sau
-!/README.md
-=======
 # 3. Ngoại trừ các file tài liệu và cấu hình gốc
-!/HUONG_DAN_SU_DUNG.md
->>>>>>> chuong
-!/.gitignore
 !/README.md
+!/HUONG_DAN_SU_DUNG.md
+!/.gitignore
 
 # ---------------------------------------------
 # Common / Shared ignores (áp dụng cho toàn dự án)
@@ -33,6 +28,12 @@ yarn-error.*
 .DS_Store
 *.pem
 *.tsbuildinfo
+
+# Lockfile của package manager khác pnpm — project này chuẩn hóa dùng pnpm
+# (đã có sẵn pnpm-lock.yaml). Tránh commit lockfile song song gây lệch
+# phiên bản dependency giữa các máy trong nhóm.
+package-lock.json
+yarn.lock
 
 # ---------------------------------------------
 # Mobile & Expo specifics

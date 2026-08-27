@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, KeyboardAvoidingVi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { colors } from '../theme';
 
 export default function RegisterScreen({ navigation, route }) {
   const [name, setName] = useState('');
@@ -53,7 +54,7 @@ export default function RegisterScreen({ navigation, route }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#0f172a" />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -73,7 +74,7 @@ export default function RegisterScreen({ navigation, route }) {
                 style={[styles.roleCard, role === 'fisherman' && styles.roleCardActive]}
                 onPress={() => setRole('fisherman')}
               >
-                <Ionicons name="boat-outline" size={32} color={role === 'fisherman' ? "#0ea5e9" : "#64748b"} />
+                <Ionicons name="boat-outline" size={32} color={role === 'fisherman' ? colors.primary : colors.textMuted} />
                 <Text style={[styles.roleText, role === 'fisherman' && styles.roleTextActive]}>Ngư Dân</Text>
               </TouchableOpacity>
 
@@ -81,14 +82,14 @@ export default function RegisterScreen({ navigation, route }) {
                 style={[styles.roleCard, role === 'trader' && styles.roleCardActive]}
                 onPress={() => setRole('trader')}
               >
-                <Ionicons name="cart-outline" size={32} color={role === 'trader' ? "#0ea5e9" : "#64748b"} />
+                <Ionicons name="cart-outline" size={32} color={role === 'trader' ? colors.primary : colors.textMuted} />
                 <Text style={[styles.roleText, role === 'trader' && styles.roleTextActive]}>Thương Lái</Text>
               </TouchableOpacity>
             </View>
 
             {/* Inputs */}
             <View style={styles.inputGroup}>
-              <Ionicons name="person-outline" size={20} color="#64748b" style={styles.inputIcon} />
+              <Ionicons name="person-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Họ và tên / Chủ tàu"
@@ -98,7 +99,7 @@ export default function RegisterScreen({ navigation, route }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Ionicons name="call-outline" size={20} color="#64748b" style={styles.inputIcon} />
+              <Ionicons name="call-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Số điện thoại di động"
@@ -109,7 +110,7 @@ export default function RegisterScreen({ navigation, route }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Ionicons name="lock-closed-outline" size={20} color="#64748b" style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Mật khẩu"
@@ -132,7 +133,7 @@ export default function RegisterScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 20,
@@ -142,7 +143,7 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 40,
     height: 40,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
@@ -159,16 +160,16 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#64748b',
+    color: colors.textMuted,
     marginBottom: 32,
   },
   formContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     padding: 24,
     borderRadius: 24,
     shadowColor: '#000',
@@ -181,7 +182,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#475569',
+    color: colors.textSecondary,
     marginBottom: 12,
   },
   roleContainer: {
@@ -197,20 +198,20 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginHorizontal: 5,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
   },
   roleCardActive: {
-    borderColor: '#0ea5e9',
-    backgroundColor: '#f0f9ff',
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
   },
   roleText: {
     marginTop: 8,
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
+    color: colors.textMuted,
   },
   roleTextActive: {
-    color: '#0ea5e9',
+    color: colors.primary,
   },
   inputGroup: {
     flexDirection: 'row',
@@ -227,23 +228,23 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 52,
     fontSize: 16,
-    color: '#0f172a',
+    color: colors.textPrimary,
   },
   registerBtn: {
-    backgroundColor: '#0ea5e9',
+    backgroundColor: colors.primary,
     height: 56,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 16,
-    shadowColor: '#0ea5e9',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
   },
   registerBtnText: {
-    color: '#ffffff',
+    color: colors.textOnPrimary,
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 1,
