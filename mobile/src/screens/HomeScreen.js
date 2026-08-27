@@ -5,6 +5,7 @@ import { MapView, Marker, Polyline } from '../components/Map';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import io from 'socket.io-client';
+import { colors } from '../theme';
 
 // Tọa độ Vùng biển Vũng Tàu giả định để làm tâm Fake GPS
 const SEA_CENTER = { latitude: 10.3240, longitude: 107.1240 };
@@ -226,7 +227,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Hải Trình & Giao Thương</Text>
-          <Text style={[styles.headerSub, { color: location ? '#10b981' : '#f59e0b' }]}>
+          <Text style={[styles.headerSub, { color: location ? colors.success : colors.warningAccent }]}>
             {location ? `Tọa độ biển: ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}` : 'Đang chờ tín hiệu GPS...'}
           </Text>
         </View>
@@ -235,8 +236,8 @@ export default function HomeScreen() {
           <Switch
             value={isDemoMode}
             onValueChange={setIsDemoMode}
-            trackColor={{ false: '#cbd5e1', true: '#ef4444' }}
-            thumbColor={isDemoMode ? '#dc2626' : '#f8fafc'}
+            trackColor={{ false: colors.borderStrong, true: colors.danger }}
+            thumbColor={isDemoMode ? colors.danger : colors.background}
             style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
           />
         </View>
@@ -244,9 +245,9 @@ export default function HomeScreen() {
 
       <View style={styles.mapContainer}>
         {Platform.OS === 'web' ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#e2e8f0' }}>
-            <Ionicons name="map-outline" size={64} color="#94a3b8" />
-            <Text style={{ marginTop: 16, color: '#64748b', textAlign: 'center', paddingHorizontal: 20 }}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.border }}>
+            <Ionicons name="map-outline" size={64} color={colors.textFaint} />
+            <Text style={{ marginTop: 16, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 20 }}>
               Bản đồ Hàng hải không hỗ trợ xem trên Trình duyệt Web.{'\n'}
               Vui lòng cài đặt App trên Điện thoại hoặc dùng phần mềm Giả lập Android (BlueStacks/Nox) để xem.
             </Text>
@@ -303,7 +304,7 @@ export default function HomeScreen() {
                   { latitude: location.latitude, longitude: location.longitude },
                   { latitude: selectedVessel.lat, longitude: selectedVessel.lng }
                 ]}
-                strokeColor="#0ea5e9"
+                strokeColor={colors.primary}
                 strokeWidth={3}
                 lineDashPattern={[5, 5]}
               />
@@ -338,8 +339,8 @@ export default function HomeScreen() {
             onPress={handleGetLocation}
             disabled={isLocating}
           >
-            <Ionicons name="radio" size={20} color={location ? "#ffffff" : "#94a3b8"} />
-            <Text style={[styles.gpsText, { color: location ? "#ffffff" : "#64748b" }]}>
+            <Ionicons name="radio" size={20} color={location ? colors.textOnPrimary : colors.textFaint} />
+            <Text style={[styles.gpsText, { color: location ? colors.textOnPrimary : colors.textMuted }]}>
               {isLocating ? 'Đang định vị...' : (location ? 'GPS Online (Vị trí biển)' : 'Bật Định Vị Vùng Biển')}
             </Text>
           </TouchableOpacity>
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: colors.textPrimary,
   },
   headerSub: {
     fontSize: 11,
@@ -382,7 +383,7 @@ const styles = StyleSheet.create({
   demoText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#ef4444',
+    color: colors.danger,
     marginBottom: -4,
   },
   mapContainer: {
@@ -405,7 +406,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.primary,
     borderWidth: 2,
     borderColor: '#ffffff',
   },
@@ -424,13 +425,13 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   markerMe: {
-    backgroundColor: '#0ea5e9',
+    backgroundColor: colors.primary,
   },
   markerTrader: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: colors.warningAccent,
   },
   markerVirtual: {
-    backgroundColor: '#e11d48',
+    backgroundColor: colors.danger,
   },
   bottomUI: {
     position: 'absolute',
@@ -458,25 +459,25 @@ const styles = StyleSheet.create({
   vesselTitle: {
     fontWeight: 'bold',
     fontSize: 16,
-    color: '#0f172a',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   vesselDesc: {
     fontSize: 13,
-    color: '#64748b',
+    color: colors.textMuted,
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#0ea5e9',
+    backgroundColor: colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
     marginLeft: 12,
   },
   actionBtnActive: {
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.danger,
   },
   actionText: {
     color: '#ffffff',
@@ -498,7 +499,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   gpsBtnActive: {
-    backgroundColor: '#10b981',
+    backgroundColor: colors.success,
   },
   gpsText: {
     fontSize: 15,

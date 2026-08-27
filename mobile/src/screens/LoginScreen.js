@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, KeyboardAvoidingVi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { colors } from '../theme';
 
 export default function LoginScreen({ navigation, route }) {
   const [phone, setPhone] = useState('');
@@ -54,7 +55,7 @@ export default function LoginScreen({ navigation, route }) {
       >
         <View style={styles.headerContainer}>
           <View style={styles.logoCircle}>
-            <Ionicons name="boat" size={48} color="#ffffff" />
+            <Ionicons name="boat" size={48} color={colors.textOnPrimary} />
           </View>
           <Text style={styles.title}>SeaTrade AI</Text>
           <Text style={styles.subtitle}>Kết nối Hàng hải & Giao thương</Text>
@@ -62,7 +63,7 @@ export default function LoginScreen({ navigation, route }) {
 
         <View style={styles.formContainer}>
           <View style={styles.inputGroup}>
-            <Ionicons name="call-outline" size={20} color="#64748b" style={styles.inputIcon} />
+            <Ionicons name="call-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="Số điện thoại / ID Tàu"
@@ -74,7 +75,7 @@ export default function LoginScreen({ navigation, route }) {
           </View>
 
           <View style={styles.inputGroup}>
-            <Ionicons name="lock-closed-outline" size={20} color="#64748b" style={styles.inputIcon} />
+            <Ionicons name="lock-closed-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="Mật khẩu"
@@ -91,7 +92,7 @@ export default function LoginScreen({ navigation, route }) {
             <Ionicons
               name={keepLoggedIn ? "checkbox" : "square-outline"}
               size={24}
-              color={keepLoggedIn ? "#0ea5e9" : "#94a3b8"}
+              color={keepLoggedIn ? colors.primary : colors.textFaint}
             />
             <Text style={styles.checkboxText}>Duy trì đăng nhập</Text>
           </TouchableOpacity>
@@ -115,7 +116,7 @@ export default function LoginScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
@@ -130,11 +131,11 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#0ea5e9',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: '#0ea5e9',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
@@ -143,15 +144,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#64748b',
+    color: colors.textMuted,
   },
   formContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     padding: 24,
     borderRadius: 24,
     shadowColor: '#000',
@@ -175,7 +176,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 52,
     fontSize: 16,
-    color: '#0f172a',
+    color: colors.textPrimary,
   },
   checkboxContainer: {
     flexDirection: 'row',
@@ -186,22 +187,22 @@ const styles = StyleSheet.create({
   checkboxText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#475569',
+    color: colors.textSecondary,
   },
   loginBtn: {
-    backgroundColor: '#0ea5e9',
+    backgroundColor: colors.primary,
     height: 56,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#0ea5e9',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
   },
   loginBtnText: {
-    color: '#ffffff',
+    color: colors.textOnPrimary,
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 1,
@@ -212,11 +213,11 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   footerText: {
-    color: '#64748b',
+    color: colors.textMuted,
     fontSize: 15,
   },
   registerText: {
-    color: '#0ea5e9',
+    color: colors.primary,
     fontSize: 15,
     fontWeight: 'bold',
     marginLeft: 6,

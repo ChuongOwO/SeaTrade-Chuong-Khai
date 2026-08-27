@@ -1,6 +1,7 @@
 import React from 'react';
-import { StyleSheet, View, Text, FlatList, Image, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, FlatList, Image, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors } from '../theme';
 
 export default function MarketScreen() {
   const mockMarketData = [
@@ -8,6 +9,17 @@ export default function MarketScreen() {
     { id: '2', species: 'Cá Thu Thuận Hải', grade: 'Size XL', price: '220,000 đ/kg', vessel: 'Biển Đông 02', distance: '4.5 NM', image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=200&q=80' },
     { id: '3', species: 'Tôm Hùm Bông', grade: 'Size A', price: '1,280,000 đ/kg', vessel: 'Phú Quốc King', distance: '12.0 NM', image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=200&q=80' },
   ];
+
+  // Nút này trước đây không có onPress (bấm vô tri). Đây chỉ là phản hồi UI
+  // tạm thời để không còn cảm giác nút chết — CHƯA gọi API chốt đơn thật,
+  // phần đó cần đồng đội nối vào backend thật sau.
+  const handleDealPress = (item) => {
+    Alert.alert(
+      'Gửi đề nghị thỏa thuận',
+      `Đã gửi yêu cầu thỏa thuận mua ${item.species} (${item.vessel}) tới thuyền trưởng. Chờ xác nhận...`,
+      [{ text: 'Đã hiểu' }]
+    );
+  };
 
   const renderItem = ({ item }) => (
     <View style={styles.card}>
@@ -17,8 +29,8 @@ export default function MarketScreen() {
         <Text style={styles.vessel}>{item.vessel} • Cách {item.distance}</Text>
         <Text style={styles.grade}>✅ AI Verified: {item.grade}</Text>
         <Text style={styles.price}>{item.price}</Text>
-        
-        <TouchableOpacity style={styles.btn}>
+
+        <TouchableOpacity style={styles.btn} onPress={() => handleDealPress(item)}>
           <Text style={styles.btnText}>Thỏa thuận & Chốt đơn</Text>
         </TouchableOpacity>
       </View>
@@ -44,23 +56,23 @@ export default function MarketScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: colors.textPrimary,
   },
   headerSub: {
     fontSize: 12,
-    color: '#64748b',
+    color: colors.textMuted,
     marginTop: 2,
   },
   list: {
@@ -68,7 +80,7 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 12,
     marginBottom: 16,
@@ -93,34 +105,34 @@ const styles = StyleSheet.create({
   species: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: colors.textPrimary,
   },
   vessel: {
     fontSize: 12,
-    color: '#64748b',
+    color: colors.textMuted,
     marginTop: 2,
   },
   grade: {
     fontSize: 12,
-    color: '#0ea5e9',
+    color: colors.primary,
     fontWeight: '600',
     marginTop: 4,
   },
   price: {
     fontSize: 14,
-    color: '#f59e0b',
+    color: colors.warningAccent,
     fontWeight: 'bold',
     marginTop: 2,
   },
   btn: {
-    backgroundColor: '#10b981',
+    backgroundColor: colors.success,
     paddingVertical: 8,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 8,
   },
   btnText: {
-    color: '#ffffff',
+    color: colors.textOnPrimary,
     fontSize: 12,
     fontWeight: 'bold',
   }
