@@ -7,6 +7,8 @@ const pool = require('./config/database');
 const errorMiddleware = require('./middleware/error.middleware');
 const authRoutes = require('./modules/auth/auth.routes');
 const vesselRoutes = require('./modules/vessels/vessel.routes');
+const speciesRoutes = require('./modules/seafood/species.routes');
+const batchRoutes = require('./modules/seafood/batch.routes');
 
 const app = express();
 
@@ -41,6 +43,8 @@ app.get('/api/health', async (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/vessels', vesselRoutes);
+app.use('/api/seafood/species', speciesRoutes);
+app.use('/api/seafood/batches', batchRoutes);
 
 // Global Error Handler
 app.use(errorMiddleware);
