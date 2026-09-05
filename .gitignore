@@ -7,6 +7,7 @@
 !/mobile/
 !/test/
 !/web/
+!/database/
 
 # 3. Ngoại trừ các file tài liệu và cấu hình gốc
 !/README.md
