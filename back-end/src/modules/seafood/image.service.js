@@ -38,7 +38,7 @@ const createImage = async (imageData) => {
 const getImagesByBatchId = async (batch_id) => {
   const query = `
     SELECT i.*, 
-           json_build_object('id', u.id, 'username', u.username, 'full_name', u.full_name) AS uploader
+           json_build_object('id', u.id, 'full_name', u.full_name) AS uploader
     FROM seafood_images i
     LEFT JOIN users u ON i.uploaded_by = u.id
     WHERE i.batch_id = $1
@@ -51,7 +51,7 @@ const getImagesByBatchId = async (batch_id) => {
 const getImageByIdAndOwner = async (image_id, owner_id) => {
   const query = `
     SELECT i.*, 
-           json_build_object('id', u.id, 'username', u.username, 'full_name', u.full_name) AS uploader
+           json_build_object('id', u.id, 'full_name', u.full_name) AS uploader
     FROM seafood_images i
     JOIN seafood_batches b ON i.batch_id = b.id
     JOIN vessels v ON b.vessel_id = v.id

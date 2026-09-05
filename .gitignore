@@ -1,14 +1,14 @@
-# 1. Chặn toàn bộ bên ngoài thư mục gốc
+# Chặn toàn bộ bên ngoài thư mục gốc
 /*
 
-# 2. Ngoại trừ các thư mục source code
+# Ngoại trừ các thư mục source code
 !/ai-service/
 !/back-end/
 !/mobile/
 !/test/
 !/web/
 
-# 3. Ngoại trừ các file tài liệu và cấu hình gốc
+# Ngoại trừ các file tài liệu và cấu hình gốc
 !/HUONG_DAN_SU_DUNG.md
 !/.gitignore
 !/README.md

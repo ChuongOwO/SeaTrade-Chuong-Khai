@@ -10,6 +10,7 @@ const vesselRoutes = require('./modules/vessels/vessel.routes');
 const speciesRoutes = require('./modules/seafood/species.routes');
 const batchRoutes = require('./modules/seafood/batch.routes');
 const imageRoutes = require('./modules/seafood/image.routes');
+const aiRoutes = require('./modules/ai/ai.routes');
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use('/api/vessels', vesselRoutes);
 app.use('/api/seafood/species', speciesRoutes);
 app.use('/api/seafood/batches', batchRoutes);
 app.use('/api/seafood/images', imageRoutes);
+app.use('/api/ai/detections', aiRoutes);
 
 // Global Error Handler
 app.use(errorMiddleware);
