@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Switch, Alert, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { API_AVATAR_URL } from '../config/api';
 
-export default function ProfileScreen({ route }) {
+export default function ProfileScreen() {
   const [userData, setUserData] = useState(null);
+  const [uploading, setUploading] = useState(false);
   
-  // Hàm đăng xuất được truyền từ AppNavigator qua MainTabs xuống ProfileScreen
-  const { onLogout } = route.params || {};
+  const { handleLogout } = useAuth();
+  const { isDarkMode, toggleTheme, colors } = useTheme();
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -24,44 +30,111 @@ export default function ProfileScreen({ route }) {
     loadUserData();
   }, []);
 
+  // Hàm chọn và upload ảnh
+  const pickImage = async () => {
+    // Xin quyền truy cập thư viện
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Cần quyền truy cập', 'Vui lòng cấp quyền truy cập thư viện ảnh để đổi Avatar.');
+      return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      uploadAvatar(result.assets[0]);
+    }
+  };
+
+  const uploadAvatar = async (asset) => {
+    try {
+      setUploading(true);
+      const token = await AsyncStorage.getItem('userToken');
+      const uri = Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri;
+
+      const uploadResult = await FileSystem.uploadAsync(API_AVATAR_URL, uri, {
+        httpMethod: 'POST',
+        uploadType: 1, // 1 = MULTIPART
+        fieldName: 'avatar',
+        mimeType: asset.mimeType || 'image/jpeg',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = JSON.parse(uploadResult.body);
+      if (uploadResult.status !== 200) throw new Error(data.message || 'Lỗi upload ảnh');
+
+      // Cập nhật state và storage
+      const updatedUser = { ...userData, avatar_url: data.metadata.avatar_url };
+      setUserData(updatedUser);
+      await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+      
+      Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện');
+    } catch (error) {
+      Alert.alert('Lỗi upload', `${error.message}\nURL: ${API_AVATAR_URL}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (!userData) {
     return (
-      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#0ea5e9" />
+      <SafeAreaView style={[{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
 
+  // Tái sử dụng styles động
+  const dynamicStyles = getDynamicStyles(colors);
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={dynamicStyles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Hồ Sơ & Cài Đặt</Text>
+        <View style={dynamicStyles.header}>
+          <Text style={dynamicStyles.headerTitle}>Hồ Sơ & Cài Đặt</Text>
         </View>
         
-        <View style={styles.profileBox}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={40} color="#0ea5e9" />
-          </View>
-          <Text style={styles.name}>{userData.name}</Text>
-          <Text style={styles.phone}>{userData.phone}</Text>
+        <View style={dynamicStyles.profileBox}>
+          <TouchableOpacity style={dynamicStyles.avatarContainer} onPress={pickImage} disabled={uploading}>
+            <View style={dynamicStyles.avatar}>
+              {uploading ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : userData.avatar_url ? (
+                <Image source={{ uri: userData.avatar_url }} style={dynamicStyles.avatarImage} />
+              ) : (
+                <Ionicons name="person" size={40} color={colors.primary} />
+              )}
+            </View>
+            <View style={dynamicStyles.editAvatarBadge}>
+              <Ionicons name="camera" size={14} color="#fff" />
+            </View>
+          </TouchableOpacity>
+          <Text style={dynamicStyles.name}>{userData.full_name || userData.name || 'Người dùng'}</Text>
+          <Text style={dynamicStyles.phone}>{userData.phone}</Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vai trò của bạn</Text>
-          <View style={styles.roleToggle}>
-            <View style={[styles.roleBtn, styles.roleBtnActive, { flex: 1 }]}>
+        <View style={dynamicStyles.section}>
+          <Text style={dynamicStyles.sectionTitle}>Vai trò của bạn</Text>
+          <View style={dynamicStyles.roleToggle}>
+            <View style={[dynamicStyles.roleBtn, dynamicStyles.roleBtnActive, { flex: 1 }]}>
               <Ionicons 
                 name={userData.role === 'fisherman' ? 'boat' : 'cube'} 
                 size={20} 
                 color="#fff" 
               />
-              <Text style={[styles.roleText, styles.roleTextActive]}>
+              <Text style={[dynamicStyles.roleText, dynamicStyles.roleTextActive]}>
                 {userData.role === 'fisherman' ? 'Ngư Dân' : 'Thương Lái'}
               </Text>
             </View>
           </View>
-          <Text style={styles.hintText}>
+          <Text style={dynamicStyles.hintText}>
             {userData.role === 'fisherman' 
               ? 'Chế độ Ngư Dân: Quét ảnh AI, báo cáo sản lượng và bật định vị chờ tàu thu mua.'
               : 'Chế độ Thương Lái: Theo dõi bản đồ tàu đánh bắt, chốt đơn và dẫn đường trên biển.'}
@@ -69,25 +142,40 @@ export default function ProfileScreen({ route }) {
         </View>
 
         {/* Section Bảng điều khiển */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cài đặt nâng cao</Text>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#fef2f2' }]}>
-                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+        <View style={dynamicStyles.section}>
+          <Text style={dynamicStyles.sectionTitle}>Cài đặt nâng cao</Text>
+
+          <View style={dynamicStyles.menuItem}>
+            <View style={dynamicStyles.menuItemLeft}>
+              <View style={[dynamicStyles.iconBox, { backgroundColor: colors.successLight }]}>
+                <Ionicons name="moon-outline" size={20} color={colors.success} />
               </View>
-              <Text style={styles.menuText}>Xóa dữ liệu Offline</Text>
+              <Text style={dynamicStyles.menuText}>Chế độ Tối (Dark Mode)</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+            <Switch 
+              value={isDarkMode} 
+              onValueChange={toggleTheme} 
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={"#fff"}
+            />
+          </View>
+          
+          <TouchableOpacity style={dynamicStyles.menuItem}>
+            <View style={dynamicStyles.menuItemLeft}>
+              <View style={[dynamicStyles.iconBox, { backgroundColor: colors.dangerLight }]}>
+                <Ionicons name="trash-outline" size={20} color={colors.danger} />
+              </View>
+              <Text style={dynamicStyles.menuText}>Xóa dữ liệu Offline</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={onLogout}>
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#f1f5f9' }]}>
-                <Ionicons name="log-out-outline" size={20} color="#64748b" />
+          <TouchableOpacity style={dynamicStyles.menuItem} onPress={handleLogout}>
+            <View style={dynamicStyles.menuItemLeft}>
+              <View style={[dynamicStyles.iconBox, { backgroundColor: colors.border }]}>
+                <Ionicons name="log-out-outline" size={20} color={colors.textSecondary} />
               </View>
-              <Text style={[styles.menuText, { color: '#64748b' }]}>Đăng xuất</Text>
+              <Text style={[dynamicStyles.menuText, { color: colors.textSecondary }]}>Đăng xuất</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -96,113 +184,142 @@ export default function ProfileScreen({ route }) {
   );
 }
 
-const styles = StyleSheet.create({
+// Bọc StyleSheet.create trong một hàm để truyền màu sắc động
+const getDynamicStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.border,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: colors.text,
   },
   profileBox: {
     alignItems: 'center',
     padding: 30,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     marginBottom: 20,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 12,
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  editAvatarBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.primary,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
   },
   name: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: colors.text,
   },
   phone: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.textSecondary,
     marginTop: 4,
   },
   section: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     padding: 20,
     marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#334155',
+    color: colors.text,
     marginBottom: 16,
   },
   roleToggle: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     borderRadius: 12,
     padding: 4,
   },
   roleBtn: {
     flex: 1,
     flexDirection: 'row',
-    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
   },
   roleBtnActive: {
-    backgroundColor: '#0ea5e9',
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   roleText: {
-    color: '#64748b',
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginLeft: 8,
   },
   roleTextActive: {
     color: '#ffffff',
   },
   hintText: {
+    fontSize: 14,
+    color: colors.textSecondary,
     marginTop: 16,
-    fontSize: 13,
-    color: '#64748b',
     lineHeight: 20,
+    fontStyle: 'italic',
   },
   menuItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.border,
   },
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
   iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 16,
   },
   menuText: {
-    fontSize: 15,
-    color: '#334155',
+    fontSize: 16,
     fontWeight: '500',
-  }
+    color: colors.text,
+  },
 });

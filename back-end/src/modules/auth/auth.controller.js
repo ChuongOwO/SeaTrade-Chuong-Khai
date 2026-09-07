@@ -129,8 +129,42 @@ const getMe = async (req, res, next) => {
   }
 };
 
+// ============================================================
+// 4. UPLOAD AVATAR
+// ============================================================
+const uploadAvatar = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    
+    if (!req.file) {
+      return res.status(400).json({ status: 400, message: 'Vui lòng chọn một file ảnh' });
+    }
+
+    // Tạo URL công khai cho file ảnh
+    // Lưu ý: Trong môi trường thực tế, domain có thể lấy từ biến môi trường
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const avatarUrl = `${protocol}://${host}/uploads/avatars/${req.file.filename}`;
+
+    // Cập nhật DB
+    await pool.query('UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2', [avatarUrl, userId]);
+
+    res.json({
+      status: 200,
+      message: 'Cập nhật ảnh đại diện thành công',
+      metadata: {
+        avatar_url: avatarUrl
+      }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
-  getMe
+  getMe,
+  uploadAvatar
 };

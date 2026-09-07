@@ -62,11 +62,197 @@ const checkVesselCodeExists = async (vessel_code) => {
   return result.rows.length > 0;
 };
 
+/**
+ * Lấy vị trí mới nhất của tất cả các tàu đang hoạt động.
+ * Dùng DISTINCT ON để lấy bản ghi mới nhất mỗi tàu.
+ */
+const getAllVesselsWithLocation = async () => {
+  const query = `
+    SELECT
+      v.id            AS vessel_id,
+      v.vessel_name,
+      v.vessel_type,
+      v.status,
+      ST_X(vl.location::geometry) AS longitude,
+      ST_Y(vl.location::geometry) AS latitude,
+      vl.speed,
+      vl.heading,
+      vl.recorded_at
+    FROM vessels v
+    INNER JOIN (
+      SELECT DISTINCT ON (vessel_id)
+        vessel_id,
+        location,
+        speed,
+        heading,
+        recorded_at
+      FROM vessel_locations
+      ORDER BY vessel_id, recorded_at DESC
+    ) vl ON v.id = vl.vessel_id
+    WHERE v.status = 'ACTIVE'
+    ORDER BY vl.recorded_at DESC
+  `;
+  const result = await pool.query(query);
+  return result.rows;
+};
+
+/**
+ * Lấy tàu hiện tại của user (tàu đầu tiên thuộc sở hữu của user + vị trí mới nhất).
+ */
+const getCurrentUserVessel = async (owner_id) => {
+  const query = `
+    SELECT
+      v.id            AS vessel_id,
+      v.vessel_name,
+      v.vessel_type,
+      v.status,
+      ST_X(vl.location::geometry) AS longitude,
+      ST_Y(vl.location::geometry) AS latitude,
+      vl.speed,
+      vl.heading,
+      vl.recorded_at
+    FROM vessels v
+    LEFT JOIN (
+      SELECT DISTINCT ON (vessel_id)
+        vessel_id,
+        location,
+        speed,
+        heading,
+        recorded_at
+      FROM vessel_locations
+      ORDER BY vessel_id, recorded_at DESC
+    ) vl ON v.id = vl.vessel_id
+    WHERE v.owner_id = $1
+    ORDER BY v.created_at ASC
+    LIMIT 1
+  `;
+  const result = await pool.query(query, [owner_id]);
+  return result.rows[0] || null;
+};
+
+/**
+ * Tính khoảng cách (mét) và bearing giữa 2 tấu bằng PostGIS.
+ * Trả về đầy đủ thông tin current + target + distance + bearing.
+ */
+const getNavigationInfo = async (owner_id, target_vessel_id, custom_lat = null, custom_lng = null) => {
+  let currentVessel = null;
+
+  if (custom_lat && custom_lng) {
+    currentVessel = {
+      vessel_id: 'me',
+      vessel_name: 'Vị trí hiện tại',
+      latitude: parseFloat(custom_lat),
+      longitude: parseFloat(custom_lng)
+    };
+  } else {
+    currentVessel = await getCurrentUserVessel(owner_id);
+    if (!currentVessel) {
+      throw { code: 'NO_CURRENT_VESSEL', message: 'Bạn chưa có tàu nào được đăng ký' };
+    }
+    if (!currentVessel.latitude) {
+      throw { code: 'NO_CURRENT_LOCATION', message: 'Tàu của bạn chưa có vị trí GPS' };
+    }
+    if (currentVessel.vessel_id === target_vessel_id) {
+      throw { code: 'SAME_VESSEL', message: 'Không thể dẫn đường tới chính tàu của bạn' };
+    }
+  }
+
+  // Lấy tàu mục tiêu + vị trí mới nhất
+  const targetQuery = `
+    SELECT
+      v.id            AS vessel_id,
+      v.vessel_name,
+      v.vessel_type,
+      ST_X(vl.location::geometry) AS longitude,
+      ST_Y(vl.location::geometry) AS latitude,
+      vl.recorded_at,
+      -- Tính khoảng cách bằng PostGIS (mét)
+      ST_Distance(
+        ST_GeographyFromText('POINT(' || $2 || ' ' || $3 || ')'),
+        vl.location
+      ) AS distance_m
+    FROM vessels v
+    INNER JOIN (
+      SELECT DISTINCT ON (vessel_id)
+        vessel_id, location, recorded_at
+      FROM vessel_locations
+      ORDER BY vessel_id, recorded_at DESC
+    ) vl ON v.id = vl.vessel_id
+    WHERE v.id = $1
+  `;
+  const targetResult = await pool.query(targetQuery, [
+    target_vessel_id,
+    currentVessel.longitude,
+    currentVessel.latitude
+  ]);
+
+  if (!targetResult.rows[0]) {
+    throw { code: 'TARGET_NOT_FOUND', message: 'Không tìm thấy tàu mục tiêu' };
+  }
+  const target = targetResult.rows[0];
+  if (!target.latitude) {
+    throw { code: 'NO_TARGET_LOCATION', message: 'Tàu mục tiêu chưa có vị trí GPS' };
+  }
+
+  // Tính bearing (góc hướng đi)
+  const bearing = calculateBearing(
+    currentVessel.latitude, currentVessel.longitude,
+    target.latitude, target.longitude
+  );
+
+  const distanceM = parseFloat(target.distance_m);
+
+  return {
+    current_vessel: {
+      vessel_id: currentVessel.vessel_id,
+      vessel_name: currentVessel.vessel_name,
+      latitude: parseFloat(currentVessel.latitude),
+      longitude: parseFloat(currentVessel.longitude),
+    },
+    target_vessel: {
+      vessel_id: target.vessel_id,
+      vessel_name: target.vessel_name,
+      latitude: parseFloat(target.latitude),
+      longitude: parseFloat(target.longitude),
+    },
+    distance_m: Math.round(distanceM),
+    distance_km: parseFloat((distanceM / 1000).toFixed(2)),
+    bearing: parseFloat(bearing.toFixed(1)),
+    bearing_text: bearingToText(bearing),
+  };
+};
+
+/** Tính bearing từ điểm 1 đến điểm 2 (0° = Bắc, 90° = Đông) */
+const calculateBearing = (lat1, lon1, lat2, lon2) => {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLon = toRad(lon2 - lon1);
+  const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+  const x =
+    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+};
+
+/** Chuyển bearing sang chữ tiếng Việt */
+const bearingToText = (bearing) => {
+  if (bearing < 22.5 || bearing >= 337.5) return 'Bắc';
+  if (bearing < 67.5)  return 'Đông Bắc';
+  if (bearing < 112.5) return 'Đông';
+  if (bearing < 157.5) return 'Đông Nam';
+  if (bearing < 202.5) return 'Nam';
+  if (bearing < 247.5) return 'Tây Nam';
+  if (bearing < 292.5) return 'Tây';
+  return 'Tây Bắc';
+};
+
 module.exports = {
   createVessel,
   getVesselsByOwner,
   getVesselByIdAndOwner,
   updateVessel,
   deleteVessel,
-  checkVesselCodeExists
+  checkVesselCodeExists,
+  getAllVesselsWithLocation,
+  getCurrentUserVessel,
+  getNavigationInfo,
 };
