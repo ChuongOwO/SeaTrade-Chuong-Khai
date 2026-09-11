@@ -37,10 +37,49 @@ export default function AdminDashboard({ posts, setPosts, vessels, orders }) {
     return matchesSearch && matchesCategory;
   });
 
+  // Xuất danh sách bài đăng đang lọc ra file CSV (mở được bằng Excel)
+  const handleExportReport = () => {
+    if (filteredPosts.length === 0) return;
+
+    const headers = [
+      'Loài hải sản', 'Mã tàu', 'Tên tàu', 'Thuyền trưởng',
+      'Sản lượng (kg)', 'Cấp độ AI', 'Độ tin cậy AI (%)',
+      'Đơn giá (đ/kg)', 'Tổng giá trị (đ)', 'Trạng thái',
+      'Vĩ độ', 'Kinh độ', 'Thời gian đánh bắt'
+    ];
+
+    const rows = filteredPosts.map(p => [
+      p.speciesName, p.vesselCode, p.vesselName, p.captain,
+      p.estimatedQuantityKg, p.aiGrade, p.aiConfidenceScore,
+      p.askingPricePerKg, p.totalValue, p.status,
+      p.lat, p.lng, p.catchTimestamp
+    ]);
+
+    const escapeCell = (cell) => `"${String(cell).replace(/"/g, '""')}"`;
+    // Thêm BOM (﻿) để Excel nhận đúng font tiếng Việt UTF-8
+    const csvContent = '﻿' + [headers, ...rows]
+      .map(row => row.map(escapeCell).join(','))
+      .join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `bao-cao-hai-san-${dateStr}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="page-section">
-      
 
+      <div className="page-header">
+        <h2 className="page-header-title">Web Admin Dashboard</h2>
+        <p className="page-header-desc">Giám sát sản lượng, giá thị trường và kiểm duyệt bài rao hải sản real-time.</p>
+      </div>
 
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-v">
@@ -83,7 +122,7 @@ export default function AdminDashboard({ posts, setPosts, vessels, orders }) {
         <div className="stat-card">
           <div className="flex items-center justify-between">
             <span className="stat-label">Đội Tàu Đang Định Vị GPS</span>
-            <div className="p-2.5 bg-cyan-100 rounded-xl text-cyan-600">
+            <div className="p-2.5 bg-sky-100 rounded-xl text-sky-600">
               <Anchor className="w-5 h-5" />
             </div>
           </div>
@@ -101,16 +140,16 @@ export default function AdminDashboard({ posts, setPosts, vessels, orders }) {
         <div className="stat-card">
           <div className="flex items-center justify-between">
             <span className="stat-label">Độ Chính Xác YOLOv8 AI</span>
-            <div className="p-2.5 bg-purple-100 rounded-xl text-purple-600">
+            <div className="p-2.5 bg-slate-100 rounded-xl text-slate-500">
               <Cpu className="w-5 h-5" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="stat-value text-purple-700">98.4%</span>
+            <span className="stat-value">98.4%</span>
             <span className="text-sm text-slate-500">mAP50</span>
           </div>
-          <p className="text-sm text-purple-600 mt-3 flex items-center gap-1.5 font-medium">
-            <Shield className="w-4 h-4 text-purple-500" /> Tự động phân loại 5 nhóm hải sản chính
+          <p className="text-sm text-slate-500 mt-3 flex items-center gap-1.5 font-medium">
+            <Shield className="w-4 h-4 text-slate-400" /> Tự động phân loại 5 nhóm hải sản chính
           </p>
         </div>
 
@@ -190,17 +229,25 @@ export default function AdminDashboard({ posts, setPosts, vessels, orders }) {
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="input-field input-select pl-9 pr-8 py-2.5 rounded-xl border-slate-200 bg-white shadow-sm font-medium text-slate-700 hover:border-sky-300 focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all appearance-none outline-none cursor-pointer text-sm"
+                  className="input-field pl-9 pr-8 appearance-none cursor-pointer"
                 >
-                  <option value="ALL">Tất cả bài rào</option>
-                  <option value="PREMIUM">Hải sản Cao cấp</option>
-                  <option value="COMMON">Hải sản Phổ thông</option>
+                  <option value="ALL">Tất cả nhóm</option>
+                  <option value="Fish">Cá đại dương</option>
+                  <option value="Shrimp">Tôm hùm/Tôm biển</option>
+                  <option value="Squid">Mực lá/Mực ống</option>
+                  <option value="Crab">Cua/Ghẹ</option>
                 </select>
               </div>
 
-              <button type="button" className="btn-export-report px-3 py-2 h-10 flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 text-sm font-semibold hover:bg-sky-100 transition-colors shrink-0">
+              <button
+                type="button"
+                onClick={handleExportReport}
+                disabled={filteredPosts.length === 0}
+                title={filteredPosts.length === 0 ? 'Không có dữ liệu để xuất' : 'Tải file CSV danh sách đang lọc'}
+                className="btn btn-outline shrink-0"
+              >
                 <FileText className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">Xuất Báo Cáo</span>
+                <span className="hidden sm:inline">Xuất Báo Cáo (CSV)</span>
               </button>
             </div>
           </div>
@@ -282,7 +329,7 @@ export default function AdminDashboard({ posts, setPosts, vessels, orders }) {
                     <td className="text-right">
                       <button
                         onClick={() => setSelectedPostModal(post)}
-                        className="px-4 py-2 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl text-sm font-semibold flex items-center gap-1.5 ml-auto transition-all shadow-sm"
+                        className="btn btn-outline btn-sm ml-auto"
                       >
                         <Eye className="w-4 h-4" /> Chi tiết AI
                       </button>
@@ -304,7 +351,7 @@ export default function AdminDashboard({ posts, setPosts, vessels, orders }) {
           <div className="bg-white max-w-2xl w-full p-8 space-y-5 relative border border-slate-200 rounded-2xl shadow-2xl">
             <button
               onClick={() => setSelectedPostModal(null)}
-              className="absolute right-5 top-5 w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 text-lg font-bold transition-colors"
+              className="btn btn-ghost btn-icon absolute right-5 top-5 text-lg"
             >
               ✕
             </button>
@@ -359,7 +406,7 @@ export default function AdminDashboard({ posts, setPosts, vessels, orders }) {
             <div className="pt-4 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setSelectedPostModal(null)}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-colors"
+                className="btn btn-secondary"
               >
                 Đóng
               </button>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Alert, Platform } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors } from '../theme';
 
 export default function CameraScreen() {
   const [facing, setFacing] = useState('back');
@@ -89,17 +90,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background,
     padding: 20,
   },
   permissionText: {
     textAlign: 'center',
     marginBottom: 20,
     fontSize: 16,
-    color: '#334155',
+    color: colors.textSecondary,
   },
   permissionBtn: {
-    backgroundColor: '#0ea5e9',
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -140,7 +141,7 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderWidth: 2,
-    borderColor: '#e11d48',
+    borderColor: colors.danger,
     borderRadius: 12,
     backgroundColor: 'transparent',
   },

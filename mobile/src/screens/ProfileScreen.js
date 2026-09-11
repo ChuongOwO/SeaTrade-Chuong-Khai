@@ -12,7 +12,8 @@ import { API_AVATAR_URL } from '../config/api';
 export default function ProfileScreen() {
   const [userData, setUserData] = useState(null);
   const [uploading, setUploading] = useState(false);
-  
+
+  // Dùng handleLogout từ AuthContext của nhánh HEAD
   const { handleLogout } = useAuth();
   const { isDarkMode, toggleTheme, colors } = useTheme();
 
@@ -30,9 +31,8 @@ export default function ProfileScreen() {
     loadUserData();
   }, []);
 
-  // Hàm chọn và upload ảnh
+  // Hàm chọn và upload ảnh (từ nhánh HEAD)
   const pickImage = async () => {
-    // Xin quyền truy cập thư viện
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Cần quyền truy cập', 'Vui lòng cấp quyền truy cập thư viện ảnh để đổi Avatar.');
@@ -70,17 +70,28 @@ export default function ProfileScreen() {
       const data = JSON.parse(uploadResult.body);
       if (uploadResult.status !== 200) throw new Error(data.message || 'Lỗi upload ảnh');
 
-      // Cập nhật state và storage
       const updatedUser = { ...userData, avatar_url: data.metadata.avatar_url };
       setUserData(updatedUser);
       await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
-      
+
       Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện');
     } catch (error) {
       Alert.alert('Lỗi upload', `${error.message}\nURL: ${API_AVATAR_URL}`);
     } finally {
       setUploading(false);
     }
+  };
+
+  // Hàm xử lý xóa dữ liệu Offline (từ nhánh duy-khai)
+  const handleClearOfflineData = () => {
+    Alert.alert(
+      'Xóa dữ liệu Offline',
+      'Thao tác này sẽ xóa các bài đăng/ảnh quét AI đã lưu tạm khi mất sóng. Bạn có chắc chắn?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Xóa', style: 'destructive', onPress: () => Alert.alert('Đã xóa', 'Dữ liệu Offline tạm thời đã được dọn dẹp.') },
+      ]
+    );
   };
 
   if (!userData) {
@@ -91,7 +102,6 @@ export default function ProfileScreen() {
     );
   }
 
-  // Tái sử dụng styles động
   const dynamicStyles = getDynamicStyles(colors);
 
   return (
@@ -100,7 +110,7 @@ export default function ProfileScreen() {
         <View style={dynamicStyles.header}>
           <Text style={dynamicStyles.headerTitle}>Hồ Sơ & Cài Đặt</Text>
         </View>
-        
+
         <View style={dynamicStyles.profileBox}>
           <TouchableOpacity style={dynamicStyles.avatarContainer} onPress={pickImage} disabled={uploading}>
             <View style={dynamicStyles.avatar}>
@@ -124,10 +134,10 @@ export default function ProfileScreen() {
           <Text style={dynamicStyles.sectionTitle}>Vai trò của bạn</Text>
           <View style={dynamicStyles.roleToggle}>
             <View style={[dynamicStyles.roleBtn, dynamicStyles.roleBtnActive, { flex: 1 }]}>
-              <Ionicons 
-                name={userData.role === 'fisherman' ? 'boat' : 'cube'} 
-                size={20} 
-                color="#fff" 
+              <Ionicons
+                name={userData.role === 'fisherman' ? 'boat' : 'cube'}
+                size={20}
+                color="#fff"
               />
               <Text style={[dynamicStyles.roleText, dynamicStyles.roleTextActive]}>
                 {userData.role === 'fisherman' ? 'Ngư Dân' : 'Thương Lái'}
@@ -135,7 +145,7 @@ export default function ProfileScreen() {
             </View>
           </View>
           <Text style={dynamicStyles.hintText}>
-            {userData.role === 'fisherman' 
+            {userData.role === 'fisherman'
               ? 'Chế độ Ngư Dân: Quét ảnh AI, báo cáo sản lượng và bật định vị chờ tàu thu mua.'
               : 'Chế độ Thương Lái: Theo dõi bản đồ tàu đánh bắt, chốt đơn và dẫn đường trên biển.'}
           </Text>
@@ -145,24 +155,26 @@ export default function ProfileScreen() {
         <View style={dynamicStyles.section}>
           <Text style={dynamicStyles.sectionTitle}>Cài đặt nâng cao</Text>
 
+          {/* Nút Dark Mode (nhánh HEAD) */}
           <View style={dynamicStyles.menuItem}>
             <View style={dynamicStyles.menuItemLeft}>
-              <View style={[dynamicStyles.iconBox, { backgroundColor: colors.successLight }]}>
+              <View style={[dynamicStyles.iconBox, { backgroundColor: colors.successLight || '#dcfce7' }]}>
                 <Ionicons name="moon-outline" size={20} color={colors.success} />
               </View>
               <Text style={dynamicStyles.menuText}>Chế độ Tối (Dark Mode)</Text>
             </View>
-            <Switch 
-              value={isDarkMode} 
-              onValueChange={toggleTheme} 
+            <Switch
+              value={isDarkMode}
+              onValueChange={toggleTheme}
               trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor={"#fff"}
             />
           </View>
-          
-          <TouchableOpacity style={dynamicStyles.menuItem}>
+
+          {/* Nút Xóa dữ liệu (kết hợp logic của duy-khai & UI của HEAD) */}
+          <TouchableOpacity style={dynamicStyles.menuItem} onPress={handleClearOfflineData}>
             <View style={dynamicStyles.menuItemLeft}>
-              <View style={[dynamicStyles.iconBox, { backgroundColor: colors.dangerLight }]}>
+              <View style={[dynamicStyles.iconBox, { backgroundColor: colors.dangerLight || '#fee2e2' }]}>
                 <Ionicons name="trash-outline" size={20} color={colors.danger} />
               </View>
               <Text style={dynamicStyles.menuText}>Xóa dữ liệu Offline</Text>
@@ -170,6 +182,7 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
 
+          {/* Nút Đăng xuất (dùng handleLogout của HEAD) */}
           <TouchableOpacity style={dynamicStyles.menuItem} onPress={handleLogout}>
             <View style={dynamicStyles.menuItemLeft}>
               <View style={[dynamicStyles.iconBox, { backgroundColor: colors.border }]}>
@@ -193,19 +206,19 @@ const getDynamicStyles = (colors) => StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface || colors.card,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.text || colors.textPrimary,
   },
   profileBox: {
     alignItems: 'center',
     padding: 30,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface || colors.card,
     marginBottom: 20,
   },
   avatarContainer: {
@@ -216,7 +229,7 @@ const getDynamicStyles = (colors) => StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primaryLight || colors.primarySoft || '#e0e7ff',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -236,27 +249,27 @@ const getDynamicStyles = (colors) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.surface,
+    borderColor: colors.surface || '#fff',
   },
   name: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.text || colors.textPrimary,
   },
   phone: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.textSecondary || colors.textMuted,
     marginTop: 4,
   },
   section: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface || colors.card,
     padding: 20,
     marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.text || colors.textSecondary,
     marginBottom: 16,
   },
   roleToggle: {
@@ -284,15 +297,15 @@ const getDynamicStyles = (colors) => StyleSheet.create({
   roleText: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.textSecondary,
+    color: colors.textSecondary || colors.textMuted,
     marginLeft: 8,
   },
   roleTextActive: {
-    color: '#ffffff',
+    color: colors.textOnPrimary || '#fff',
   },
   hintText: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.textSecondary || colors.textMuted,
     marginTop: 16,
     lineHeight: 20,
     fontStyle: 'italic',
@@ -320,6 +333,6 @@ const getDynamicStyles = (colors) => StyleSheet.create({
   menuText: {
     fontSize: 16,
     fontWeight: '500',
-    color: colors.text,
+    color: colors.text || colors.textPrimary,
   },
 });

@@ -50,17 +50,30 @@ export default function MaritimeMap({ vessels, posts, orders }) {
     return (R * c).toFixed(1);
   };
 
-  const currentDistanceNM = (selectedVessel && targetVesselForRoute) 
+  const currentDistanceNM = (selectedVessel && targetVesselForRoute)
     ? calculateDistanceNM(
         selectedVessel.lat, selectedVessel.lng,
         targetVesselForRoute.lat, targetVesselForRoute.lng
       )
     : "0.0";
 
+  // ETA tính từ khoảng cách thật / tốc độ trung bình 2 tàu (trước đây là chuỗi tĩnh "~18 Phút")
+  const closingSpeedKnots = (selectedVessel && targetVesselForRoute)
+    ? ((selectedVessel.speedKnots || 0) + (targetVesselForRoute.speedKnots || 0)) / 2
+    : 0;
+  const etaLabel = closingSpeedKnots > 0
+    ? `~${Math.max(1, Math.round((parseFloat(currentDistanceNM) / closingSpeedKnots) * 60))} Phút`
+    : 'Không xác định';
+
+  const otherVessels = selectedVessel ? vessels.filter(v => v.id !== selectedVessel.id) : vessels;
+
   return (
     <div className="page-section">
 
-
+      <div className="page-header">
+        <h2 className="page-header-title">Bản Đồ Hải Trình & Chỉ Đường GPS</h2>
+        <p className="page-header-desc">Vị trí thực tế của tàu đánh bắt và tàu thu gom, khoảng cách và thời gian di chuyển ước tính.</p>
+      </div>
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-v">
@@ -78,19 +91,19 @@ export default function MaritimeMap({ vessels, posts, orders }) {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setFilterType('ALL')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterType === 'ALL' ? 'bg-sky-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                className={`btn btn-sm ${filterType === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
               >
                 Tất cả ({vessels.length})
               </button>
               <button
                 onClick={() => setFilterType('FISHING')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterType === 'FISHING' ? 'bg-sky-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                className={`btn btn-sm ${filterType === 'FISHING' ? 'btn-primary' : 'btn-secondary'}`}
               >
                 ⛵ Tàu đánh bắt
               </button>
               <button
                 onClick={() => setFilterType('COLLECTOR')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterType === 'COLLECTOR' ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                className={`btn btn-sm ${filterType === 'COLLECTOR' ? 'btn-success' : 'btn-secondary'}`}
               >
                 🛥️ Tàu thu gom
               </button>
@@ -115,7 +128,14 @@ export default function MaritimeMap({ vessels, posts, orders }) {
                   position={[vessel.lat, vessel.lng]}
                   icon={vessel.type === 'fishing' ? fishingIcon : collectorIcon}
                   eventHandlers={{
-                    click: () => setSelectedVessel(vessel),
+                    click: () => {
+                      setSelectedVessel(vessel);
+                      // Tránh trường hợp tàu đang chọn trùng với tàu đích tuyến đường
+                      if (targetVesselForRoute && vessel.id === targetVesselForRoute.id) {
+                        const alt = vessels.find(v => v.id !== vessel.id);
+                        if (alt) setTargetVesselForRoute(alt);
+                      }
+                    },
                   }}
                 >
                   <Popup>
@@ -141,15 +161,29 @@ export default function MaritimeMap({ vessels, posts, orders }) {
 
           {/* Navigational Routing Summary Bar */}
           <div className="p-5 bg-sky-50 rounded-xl border border-sky-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-sky-100 rounded-xl text-sky-600">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="p-3 bg-sky-100 rounded-xl text-sky-600 shrink-0">
                 <Navigation className="w-5 h-5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <span className="text-slate-500 block text-xs mb-0.5">Đoạn Đường Gặp Nhau Hàng Hải:</span>
-                <span className="font-extrabold text-slate-900 text-sm">
-                  {selectedVessel ? selectedVessel.name : 'Đang chờ...'} ➔ {targetVesselForRoute ? targetVesselForRoute.name : 'Đang chờ...'}
-                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-extrabold text-slate-900 text-sm">{selectedVessel ? selectedVessel.name : 'Đang chờ...'}</span>
+                  <span className="text-sky-500">➔</span>
+                  {targetVesselForRoute ? (
+                    <select
+                      value={targetVesselForRoute.id}
+                      onChange={(e) => setTargetVesselForRoute(vessels.find(v => v.id === e.target.value) || targetVesselForRoute)}
+                      className="input-field text-xs font-bold py-1 px-2"
+                    >
+                      {otherVessels.map(v => (
+                        <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-sm text-slate-500">Đang chờ...</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -160,7 +194,7 @@ export default function MaritimeMap({ vessels, posts, orders }) {
               </div>
               <div className="text-center">
                 <span className="text-slate-500 block text-xs mb-0.5">ETA:</span>
-                <span className="text-emerald-600 font-bold text-base">~18 Phút</span>
+                <span className="text-emerald-600 font-bold text-base">{etaLabel}</span>
               </div>
             </div>
           </div>

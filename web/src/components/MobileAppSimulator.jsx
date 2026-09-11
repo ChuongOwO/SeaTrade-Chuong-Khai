@@ -25,9 +25,8 @@ import {
 } from 'lucide-react';
 import { SEAFOOD_SPECIES } from '../data/mockData';
 
-export default function MobileAppSimulator({ posts, setPosts, vessels, orders, setOrders, offlineMode }) {
-  const [activeRole, setActiveRole] = useState('FISHERMAN'); // 'FISHERMAN' or 'TRADER'
-  const [mobileTab, setMobileTab] = useState('HOME'); // 'HOME', 'SCAN_POST', 'MAP', 'ORDERS'
+export default function MobileAppSimulator({ posts, setPosts, vessels, orders, setOrders, offlineMode, activeRole, setActiveRole }) {
+  const [mobileTab, setMobileTab] = useState('HOME'); // 'HOME', 'SCAN_POST', 'ORDERS'
   
   // Fisherman Mode State: AI Scanning & Post Creation
   const [selectedSamplePhoto, setSelectedSamplePhoto] = useState(SEAFOOD_SPECIES[0]);
@@ -260,7 +259,7 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
                     </p>
                     <button
                       onClick={() => setMobileTab('SCAN_POST')}
-                      className="w-full py-2.5 bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-400 hover:to-cyan-400 text-white font-bold rounded-xl shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2"
+                      className="w-full py-2.5 bg-sky-500 hover:bg-sky-400 text-white font-bold rounded-xl shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2 transition-colors"
                     >
                       <Camera className="w-4 h-4" /> Quét AI & Đăng Bán Tốc Hành
                     </button>
@@ -363,7 +362,7 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
                           <button
                             onClick={handleStartAIScan}
                             disabled={isScanningAI}
-                            className="w-full py-2.5 bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-500 hover:to-cyan-500 text-white font-bold rounded-xl shadow-md flex items-center justify-center gap-2"
+                            className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl shadow-md flex items-center justify-center gap-2 transition-colors"
                           >
                             <Zap className="w-4 h-4" /> Chạy Mô-Đun Quét AI
                           </button>
@@ -416,7 +415,7 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
 
                           <button
                             type="submit"
-                            className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2"
+                            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors"
                           >
                             <Send className="w-4 h-4" /> Phát Sóng Rao Bán Lên Bản Đồ Biển
                           </button>
@@ -497,6 +496,46 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
             </div>
           )}
 
+          {/* ============================================================== */}
+          {/* ORDER HISTORY (shared by both roles)                            */}
+          {/* ============================================================== */}
+          {mobileTab === 'ORDERS' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-cyan-400" /> Lịch Sử Giao Dịch
+                </h3>
+                <button onClick={() => setMobileTab('HOME')} className="text-slate-400 hover:text-white text-xs">Đóng</button>
+              </div>
+
+              {orders.length === 0 ? (
+                <div className="p-6 text-center text-slate-400 text-xs">Chưa có đơn hàng nào được chốt.</div>
+              ) : (
+                orders.map((order) => (
+                  <div key={order.id} className="glass-panel p-3 space-y-2 border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-cyan-300 text-xs font-bold">{order.id}</span>
+                      <span className={`badge-sm ${
+                        order.status === 'COMPLETED' ? 'badge-emerald' :
+                        order.status === 'IN_TRANSIT' ? 'badge-cyan' : 'badge-amber'
+                      }`}>
+                        {order.status === 'COMPLETED' ? 'Hoàn tất' : order.status === 'IN_TRANSIT' ? 'Đang giao' : 'Đã hủy'}
+                      </span>
+                    </div>
+                    <p className="text-white font-semibold text-xs">{order.speciesName} • {order.quantityKg} kg</p>
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="truncate">{order.sellerName} → {order.buyerName}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500">{order.timestamp}</span>
+                      <span className="font-mono text-amber-400 font-bold">{order.totalAmount.toLocaleString()} đ</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
         </div>
 
         {/* Mobile Screen Bottom Navigation Bar */}
@@ -522,7 +561,10 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
               <Compass className="w-4 h-4" /> Rada Biển
             </button>
           )}
-          <button className="flex flex-col items-center gap-1 p-1">
+          <button
+            onClick={() => setMobileTab('ORDERS')}
+            className={`flex flex-col items-center gap-1 p-1 ${mobileTab === 'ORDERS' ? 'text-cyan-400 font-bold' : ''}`}
+          >
             <Clock className="w-4 h-4" /> Lịch sử ({orders.length})
           </button>
         </div>
@@ -572,7 +614,7 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
 
             <button
               onClick={() => handleConfirmOrderDeal(selectedPostForTrade)}
-              className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 text-xs"
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 text-xs transition-colors"
             >
               <CheckCircle className="w-4 h-4" /> Chốt Đơn & Bật Chỉ Đường GPS Di Chuyển
             </button>

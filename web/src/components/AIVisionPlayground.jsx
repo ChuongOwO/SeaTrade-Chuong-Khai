@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Cpu, 
-  Upload, 
-  ShieldCheck, 
-  Layers, 
+import {
+  Upload,
+  ShieldCheck,
+  Layers,
   RefreshCw
 } from 'lucide-react';
 import { SEAFOOD_SPECIES } from '../data/mockData';
@@ -68,26 +67,18 @@ export default function AIVisionPlayground() {
     <div className="page-section">
       
       {/* Top Banner */}
-      <div className="page-header">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
-          <div>
-            <div className="flex flex-wrap items-center gap-2.5 mb-2">
-              <span className="badge badge-cyan">Mô-Đun Xử Lý Ảnh Computer Vision</span>
-              <span className="text-sm text-slate-500 font-mono">Model YOLOv8 & ResNet Backbones</span>
-            </div>
-            <h2 className="page-header-title flex items-center gap-2.5">
-              <Cpu className="w-7 h-7 text-cyan-600" /> Studio Phân Loại & Đánh Giá Hải Sản AI
-            </h2>
-            <p className="page-header-desc">
-              Thử nghiệm quét nhận dạng các loài hải sản ven biển (Cá ngừ, Cá thu, Tôm hùm, Mực lá, Cua biển), tự động vẽ bounding box, đo kích thước, đánh giá chỉ số tươi sống và tự động tính toán đơn giá thị trường.
-            </p>
-          </div>
-
-          <label className="cursor-pointer px-5 py-3 bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-500 hover:to-cyan-500 text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-sky-500/20 transition-all shrink-0">
-            <Upload className="w-4 h-4" /> Tải Ảnh Thực Tế
-            <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-          </label>
+      <div className="page-header flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="page-header-title">Studio Phân Loại & Đánh Giá Hải Sản AI</h2>
+          <p className="page-header-desc">
+            Thử nghiệm quét nhận dạng các loài hải sản ven biển (Cá ngừ, Cá thu, Tôm hùm, Mực lá, Cua biển), tự động vẽ bounding box, đo kích thước, đánh giá chỉ số tươi sống và tự động tính toán đơn giá thị trường.
+          </p>
         </div>
+
+        <label className="btn btn-primary cursor-pointer shrink-0">
+          <Upload className="w-4 h-4" /> Tải Ảnh Thực Tế
+          <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+        </label>
       </div>
 
       {/* Main Grid Studio */}
@@ -143,7 +134,7 @@ export default function AIVisionPlayground() {
               <button
                 onClick={() => runAIDetection(selectedSpecies, customImage || selectedSpecies.sampleImage)}
                 disabled={isProcessing}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-sky-700 rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors"
+                className="btn btn-secondary btn-sm"
               >
                 <RefreshCw className={`w-4 h-4 ${isProcessing ? 'animate-spin' : ''}`} /> Quét Lại
               </button>
@@ -159,9 +150,9 @@ export default function AIVisionPlayground() {
               />
 
               {isProcessing && (
-                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
-                  <div className="w-14 h-14 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-base font-bold text-cyan-300 animate-pulse">
+                <div className="absolute inset-0 bg-slate-950/80 flex flex-col items-center justify-center gap-4">
+                  <div className="w-14 h-14 border-4 border-sky-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-base font-bold text-sky-300 animate-pulse">
                     Mô hình YOLOv8 đang trích xuất đặc trưng hình ảnh...
                   </span>
                 </div>

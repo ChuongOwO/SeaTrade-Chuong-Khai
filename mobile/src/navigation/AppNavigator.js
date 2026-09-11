@@ -6,6 +6,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { TouchableOpacity } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { colors } from '../theme';
 
 import HomeScreen from '../screens/HomeScreen';
 import MarketScreen from '../screens/MarketScreen';
@@ -32,10 +34,10 @@ const CustomScanButton = ({ onPress }) => (
       width: 68,
       height: 68,
       borderRadius: 34,
-      backgroundColor: '#e11d48',
+      backgroundColor: colors.danger,
       justifyContent: 'center',
       alignItems: 'center',
-      shadowColor: '#e11d48',
+      shadowColor: colors.danger,
       shadowOffset: { width: 0, height: 6 },
       shadowOpacity: 0.35,
       shadowRadius: 8,
@@ -43,9 +45,9 @@ const CustomScanButton = ({ onPress }) => (
       borderWidth: 4,
       borderColor: '#ffffff',
     }}>
-      <MaterialCommunityIcons name="line-scan" size={30} color="#ffffff" />
+      <MaterialCommunityIcons name="line-scan" size={30} color={colors.textOnPrimary} />
     </View>
-    <Text style={{ fontSize: 11, color: '#e11d48', fontWeight: 'bold', marginTop: 4 }}>Quét</Text>
+    <Text style={{ fontSize: 11, color: colors.danger, fontWeight: 'bold', marginTop: 4 }}>Quét</Text>
   </TouchableOpacity>
 );
 
@@ -57,8 +59,8 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         tabBarShowLabel: true,
-        tabBarActiveTintColor: '#0ea5e9',
-        tabBarInactiveTintColor: isDarkMode ? '#64748b' : '#94a3b8',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textFaint,
         tabBarStyle: {
           backgroundColor: colors.card,
           borderTopWidth: 1,
@@ -122,9 +124,9 @@ export default function AppNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
-        <ActivityIndicator size="large" color="#0ea5e9" />
-        <Text style={{ marginTop: 10, color: '#64748b' }}>Đang nạp phiên đăng nhập...</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.card }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 10, color: colors.textMuted }}>Đang nạp phiên đăng nhập...</Text>
       </View>
     );
   }

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, Dimensions, TouchableOpacity, Alert, Switch, Platform } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { StyleSheet, View, Text, Dimensions, TouchableOpacity, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LeafletMap from '../components/LeafletMap';
 import * as Location from 'expo-location';
@@ -27,11 +27,11 @@ export default function HomeScreen() {
   const initialRegion = {
     latitude: 10.324,
     longitude: 107.124,
-    latitudeDelta: 0.1,
-    longitudeDelta: 0.1,
+    latitudeDelta: 0.2, // Tăng delta để thấy tàu xa hơn
+    longitudeDelta: 0.2,
   };
 
-  // Fetch dữ liệu tàu từ Backend API (Thay vì Socket cho Demo)
+  // Fetch dữ liệu tàu từ Backend API
   const fetchVesselsLocations = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
@@ -47,7 +47,7 @@ export default function HomeScreen() {
       if (data.status === 200) {
         setApiError(null);
         const mapped = data.metadata.map(v => ({
-          id: v.vessel_id,
+          id: String(v.vessel_id),
           title: v.vessel_name,
           description: `Tốc độ: ${v.speed || 0} Knots`,
           lat: parseFloat(v.latitude),
@@ -70,8 +70,6 @@ export default function HomeScreen() {
     const interval = setInterval(fetchVesselsLocations, 10000);
     return () => clearInterval(interval);
   }, []);
-
-  // Xóa logic tàu ảo demo
 
   const handleGetLocation = async () => {
     setIsLocating(true);
@@ -119,17 +117,6 @@ export default function HomeScreen() {
     }
   };
 
-  // Tính khoảng cách ước tính (Hải lý - NM)
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distanceKm = R * c;
-    return (distanceKm / 1.852).toFixed(2);
-  };
-
   const handleMapPress = () => {
     setSelectedVessel(null);
     setIsNavigating(false);
@@ -163,8 +150,8 @@ export default function HomeScreen() {
              mapRef.current.animateToRegion({
                latitude: nav.current_vessel.latitude,
                longitude: nav.current_vessel.longitude,
-               latitudeDelta: 0.1,
-               longitudeDelta: 0.1,
+               latitudeDelta: 0.2,
+               longitudeDelta: 0.2,
              });
           }
         }
@@ -209,18 +196,18 @@ export default function HomeScreen() {
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Hải Trình & Giao Thương</Text>
-          <Text style={[styles.headerSub, { color: location ? '#10b981' : '#f59e0b' }]}>
+          <Text style={[styles.headerSub, { color: location ? colors.success : colors.warningAccent }]}>
             {location ? `Tọa độ biển: ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}` : 'Đang chờ tín hiệu GPS...'}
           </Text>
-          <Text style={{ fontSize: 10, color: 'red' }}>Debug: {liveVessels.length} tàu | Err: {apiError || 'None'}</Text>
+          {apiError && <Text style={{ fontSize: 10, color: colors.danger, marginTop: 4 }}>Lỗi: {apiError}</Text>}
         </View>
       </View>
 
       <View style={styles.mapContainer}>
         {Platform.OS === 'web' ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#e2e8f0' }}>
-            <Ionicons name="map-outline" size={64} color="#94a3b8" />
-            <Text style={{ marginTop: 16, color: '#64748b', textAlign: 'center', paddingHorizontal: 20 }}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.border }}>
+            <Ionicons name="map-outline" size={64} color={colors.textFaint} />
+            <Text style={{ marginTop: 16, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 20 }}>
               Bản đồ Hàng hải không hỗ trợ xem trên Trình duyệt Web.{'\n'}
               Vui lòng cài đặt App trên Điện thoại hoặc dùng phần mềm Giả lập Android (BlueStacks/Nox) để xem.
             </Text>
@@ -287,8 +274,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#0f172a' },
   headerSub: { fontSize: 11, marginTop: 2, fontWeight: '600' },
-  demoToggle: { flexDirection: 'column', alignItems: 'center' },
-  demoText: { fontSize: 10, fontWeight: 'bold', color: '#ef4444', marginBottom: -4 },
   mapContainer: { flex: 1, position: 'relative' },
   map: { width: Dimensions.get('window').width, height: '100%' },
   bottomUI: { position: 'absolute', bottom: 20, left: 20, right: 20, gap: 12 },

@@ -1,0 +1,331 @@
+// ============================================================================
+// SeaTrade AI — Sơ đồ ERD (bản hợp nhất chính thức, 04/09/2026)
+// Dán toàn bộ file này vào https://dbdiagram.io/d (New Diagram > xoá mẫu có
+// sẵn > paste code này vào) để xem/chỉnh sơ đồ trực quan, kéo thả được.
+// Khớp 1-1 với schema.sql trong cùng bộ hồ sơ.
+// ============================================================================
+
+// ---------- NHÓM 1: NGƯỜI DÙNG / TÀU ----------
+
+Table users [headercolor: #2E5EAA] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  full_name varchar(150) [not null]
+  phone varchar(20) [unique, not null]
+  email varchar(150) [unique]
+  password_hash text [not null]
+  role varchar(20) [not null, default: 'trader', note: 'CHECK: fisherman | trader | admin']
+  avatar_url text
+  is_active boolean [not null, default: true]
+  client_id uuid [note: 'id sinh trên mobile lúc offline']
+  deleted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table vessels [headercolor: #2E5EAA] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  owner_id uuid [not null, ref: > users.id]
+  registration_code varchar(30) [unique, not null]
+  name varchar(150) [not null]
+  vessel_type varchar(20) [not null, default: 'fishing', note: 'CHECK: fishing | collector']
+  home_port varchar(150)
+  power_hp decimal(8,2)
+  cold_storage_capacity_kg decimal(10,2)
+  current_load_kg decimal(10,2) [default: 0]
+  current_location geography [note: 'GEOGRAPHY(Point,4326) - snapshot mới nhất']
+  heading_degrees decimal(5,2)
+  speed_knots decimal(5,2)
+  fuel_percent decimal(5,2)
+  battery_percent decimal(5,2)
+  last_position_at timestamptz
+  status varchar(30) [not null, default: 'OFFLINE', note: 'CHECK: ACTIVE_FISHING|ANCHORED_HAULING|PATROLLING_BUYING|DOCKED|OFFLINE']
+  client_id uuid
+  deleted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table vessel_locations [headercolor: #2E5EAA] {
+  id bigint [pk, increment]
+  vessel_id uuid [not null, ref: > vessels.id]
+  location geography [not null, note: 'GEOGRAPHY(Point,4326)']
+  heading_degrees decimal(5,2)
+  speed_knots decimal(5,2)
+  accuracy_m decimal(6,2)
+  recorded_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (vessel_id, recorded_at) [name: 'idx_vessel_locations_vessel_time']
+  }
+}
+
+// ---------- NHÓM 2: DANH MỤC THAM CHIẾU ----------
+
+Table species [headercolor: #5B4B8A] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(150) [not null]
+  scientific_name varchar(150)
+  category varchar(30) [not null, note: 'CHECK: Fish|Shrimp|Squid|Crab|Other']
+  unit varchar(10) [not null, default: 'kg']
+  base_price_min decimal(12,2)
+  base_price_max decimal(12,2)
+  description text
+  sample_image_url text
+  ai_label varchar(50) [unique, note: 'nhãn thô model AI trả về, NULL nếu AI chưa nhận diện được loài này']
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table species_grades [headercolor: #5B4B8A] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  species_id uuid [not null, ref: > species.id]
+  grade_label varchar(100) [not null]
+  price_multiplier decimal(4,2) [not null, default: 1.00]
+  criteria text
+  sort_order smallint [not null, default: 0]
+}
+
+Table market_price_snapshots [headercolor: #5B4B8A] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  species_id uuid [not null, ref: > species.id]
+  snapshot_date date [not null]
+  avg_price decimal(12,2) [not null]
+  grade_a_price decimal(12,2)
+  grade_b_price decimal(12,2)
+  sample_size int [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (species_id, snapshot_date) [unique]
+  }
+}
+
+// ---------- NHÓM 3: MẺ ĐÁNH BẮT & PIPELINE AI ----------
+
+Table catch_batches [headercolor: #0E7C7B] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  vessel_id uuid [not null, ref: > vessels.id]
+  species_id uuid [ref: > species.id, note: 'có thể NULL nếu AI chưa xác định xong']
+  quantity_kg decimal(10,2) [not null]
+  quality_level varchar(10) [not null, default: 'B', note: 'CHECK: A|B|C']
+  freshness_score decimal(5,2)
+  size_min_cm decimal(6,2)
+  size_max_cm decimal(6,2)
+  catch_location geography [note: 'GEOGRAPHY(Point,4326)']
+  catch_at timestamptz [not null, default: `now()`]
+  status varchar(20) [not null, default: 'RECORDED', note: 'CHECK: RECORDED|LISTED|SOLD_OUT|DISCARDED']
+  client_id uuid
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table catch_images [headercolor: #0E7C7B] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  batch_id uuid [not null, ref: > catch_batches.id]
+  image_url text [not null]
+  thumbnail_url text
+  uploaded_by uuid [ref: > users.id]
+  captured_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table ai_detections [headercolor: #0E7C7B] {
+  id bigint [pk, increment]
+  image_id uuid [not null, ref: > catch_images.id]
+  model_version varchar(50) [not null]
+  species_id uuid [ref: > species.id, note: 'NULL nếu model không map được nhãn']
+  raw_label varchar(50) [note: 'nhãn thô model trả, trước khi map sang species']
+  confidence decimal(5,4)
+  bbox_x decimal(6,2)
+  bbox_y decimal(6,2)
+  bbox_width decimal(6,2)
+  bbox_height decimal(6,2)
+  estimated_size_cm decimal(6,2)
+  quality_score decimal(5,2)
+  freshness_score decimal(5,2)
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// ---------- NHÓM 4: GIAO DỊCH LÕI ----------
+
+Table listings [headercolor: #1F7A5C] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  batch_id uuid [not null, ref: > catch_batches.id]
+  vessel_id uuid [not null, ref: > vessels.id]
+  species_id uuid [not null, ref: > species.id]
+  grade_id uuid [ref: > species_grades.id]
+  title varchar(200)
+  description text
+  price_per_kg decimal(12,2) [not null]
+  quantity_available_kg decimal(10,2) [not null]
+  total_value decimal(14,2) [note: 'GENERATED ALWAYS AS (price_per_kg * quantity_available_kg) STORED']
+  listing_location geography [note: 'GEOGRAPHY(Point,4326)']
+  status varchar(20) [not null, default: 'OPEN', note: 'CHECK: OPEN|IN_NEGOTIATION|LOCKED|SOLD|EXPIRED|CANCELLED']
+  published_at timestamptz [not null, default: `now()`]
+  expires_at timestamptz
+  client_id uuid
+  deleted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table listing_offers [headercolor: #1F7A5C] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  listing_id uuid [not null, ref: > listings.id]
+  buyer_id uuid [not null, ref: > users.id]
+  seller_id uuid [not null, ref: > users.id]
+  parent_offer_id uuid [ref: > listing_offers.id, note: 'offer trước đó trong cùng chuỗi đàm phán']
+  quantity_kg decimal(10,2) [not null]
+  price_per_kg decimal(12,2) [not null]
+  message text
+  status varchar(20) [not null, default: 'PENDING', note: 'CHECK: PENDING|ACCEPTED|REJECTED|WITHDRAWN|EXPIRED']
+  expires_at timestamptz
+  responded_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// ---------- NHÓM 5: ĐƠN HÀNG & GIAO NHẬN ----------
+
+Table orders [headercolor: #1F7A5C] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_code varchar(30) [unique, not null]
+  buyer_id uuid [not null, ref: > users.id]
+  seller_vessel_id uuid [not null, ref: > vessels.id]
+  accepted_offer_id uuid [ref: > listing_offers.id]
+  total_amount decimal(14,2) [not null, default: 0, note: 'tổng nhiều order_items — KHÔNG generated, backend/trigger tự cập nhật']
+  status varchar(20) [not null, default: 'PENDING', note: 'CHECK: PENDING|CONFIRMED|IN_TRANSIT|COMPLETED|CANCELLED']
+  note text
+  client_id uuid
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table order_items [headercolor: #1F7A5C] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null, ref: > orders.id]
+  listing_id uuid [not null, ref: > listings.id]
+  quantity_kg decimal(10,2) [not null]
+  price_per_kg decimal(12,2) [not null]
+  subtotal decimal(14,2) [note: 'GENERATED ALWAYS AS (quantity_kg * price_per_kg) STORED']
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table deliveries [headercolor: #B15A00] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null, ref: > orders.id]
+  buyer_vessel_id uuid [ref: > vessels.id, note: 'NULL nếu buyer là thương lái trên bờ']
+  seller_vessel_id uuid [not null, ref: > vessels.id]
+  meeting_location geography [note: 'GEOGRAPHY(Point,4326)']
+  scheduled_at timestamptz
+  actual_at timestamptz
+  status varchar(20) [not null, default: 'SCHEDULED', note: 'CHECK: SCHEDULED|EN_ROUTE|COMPLETED|FAILED|CANCELLED']
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table payments [headercolor: #B15A00] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null, ref: > orders.id]
+  amount decimal(14,2) [not null]
+  payment_method varchar(20) [not null, default: 'CASH', note: 'CHECK: CASH|BANK_TRANSFER|E_WALLET']
+  status varchar(20) [not null, default: 'PENDING', note: 'CHECK: PENDING|PAID|FAILED|REFUNDED']
+  transaction_code varchar(60)
+  paid_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table reviews [headercolor: #B15A00] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  order_id uuid [not null, ref: > orders.id]
+  reviewer_id uuid [not null, ref: > users.id]
+  reviewed_user_id uuid [not null, ref: > users.id]
+  rating smallint [not null, note: 'CHECK: 1..5']
+  comment text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (order_id, reviewer_id) [unique]
+  }
+}
+
+// ---------- NHÓM 6: LIÊN LẠC & HẠ TẦNG HỖ TRỢ ----------
+
+Table conversations [headercolor: #B15A00] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  buyer_id uuid [not null, ref: > users.id]
+  seller_id uuid [not null, ref: > users.id]
+  listing_id uuid [ref: > listings.id]
+  order_id uuid [ref: > orders.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'CHECK: listing_id IS NOT NULL OR order_id IS NOT NULL'
+}
+
+Table messages [headercolor: #B15A00] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  conversation_id uuid [not null, ref: > conversations.id]
+  sender_id uuid [not null, ref: > users.id]
+  message text [not null]
+  is_read boolean [not null, default: false]
+  client_id uuid [note: 'id sinh trên mobile khi gửi lúc mất mạng']
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table notifications [headercolor: #B15A00] {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  title varchar(200) [not null]
+  content text
+  notification_type varchar(30) [not null, default: 'GENERAL', note: 'CHECK: GENERAL|OFFER|ORDER|DELIVERY|PAYMENT|SYSTEM']
+  reference_id uuid [note: 'id của order/offer/listing liên quan, tuỳ notification_type']
+  is_read boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table idempotency_keys [headercolor: #B15A00] {
+  idempotency_key varchar(100) [pk]
+  endpoint varchar(200) [not null]
+  request_hash varchar(64) [not null]
+  response_status smallint
+  response_body jsonb
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'Chống xử lý trùng khi mobile gửi lại request do mất mạng giữa biển'
+}
+
+// ---------- Nhóm hiển thị trên canvas (kéo-thả theo cụm) ----------
+
+TableGroup "Người dùng / Tàu" [color: #2E5EAA] {
+  users
+  vessels
+  vessel_locations
+}
+
+TableGroup "Danh mục tham chiếu" [color: #5B4B8A] {
+  species
+  species_grades
+  market_price_snapshots
+}
+
+TableGroup "Mẻ đánh bắt & AI" [color: #0E7C7B] {
+  catch_batches
+  catch_images
+  ai_detections
+}
+
+TableGroup "Giao dịch lõi" [color: #1F7A5C] {
+  listings
+  listing_offers
+  orders
+  order_items
+}
+
+TableGroup "Giao nhận / liên lạc / hạ tầng" [color: #B15A00] {
+  deliveries
+  payments
+  reviews
+  conversations
+  messages
+  notifications
+  idempotency_keys
+}

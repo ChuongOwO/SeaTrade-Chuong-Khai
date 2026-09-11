@@ -6,15 +6,63 @@ import {
   MapPin
 } from 'lucide-react';
 
-export default function AnalyticsView({ posts, orders }) {
+const CATEGORY_LABELS = {
+  Fish: 'Cá Đại Dương (Ngừ, Thu...)',
+  Shrimp: 'Tôm / Tôm Hùm',
+  Squid: 'Mực Lá / Mực Ống',
+  Crab: 'Cua / Ghẹ'
+};
+
+const CATEGORY_COLORS = ['bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500'];
+const CATEGORY_TEXT_COLORS = ['text-sky-600', 'text-emerald-600', 'text-amber-600', 'text-rose-600'];
+const REGION_TEXT_COLORS = ['text-sky-600', 'text-emerald-600', 'text-amber-600', 'text-rose-600'];
+
+export default function AnalyticsView({ posts, orders, vessels = [] }) {
   const totalTradeValue = orders.reduce((sum, o) => sum + o.totalAmount, 0) + 252000000;
   const totalVolumeKg = posts.reduce((sum, p) => sum + p.estimatedQuantityKg, 0) + 1450;
   const estimatedFuelSavedLiters = Math.round(orders.length * 145 + 1850);
 
+  // Tỷ trọng sản lượng theo loài — tính thật từ mảng posts (trước đây là JSX tĩnh)
+  const postsVolumeKg = posts.reduce((sum, p) => sum + p.estimatedQuantityKg, 0) || 1;
+  const categoryBreakdown = Object.entries(
+    posts.reduce((acc, p) => {
+      acc[p.category] = (acc[p.category] || 0) + p.estimatedQuantityKg;
+      return acc;
+    }, {})
+  )
+    .map(([category, kg]) => ({
+      category,
+      label: CATEGORY_LABELS[category] || category,
+      kg,
+      pct: (kg / postsVolumeKg) * 100
+    }))
+    .sort((a, b) => b.kg - a.kg);
+
+  // Sản lượng theo vùng biển — nối posts.vesselCode với vessels.homePort thay vì hardcode 3 vùng cố định
+  const regionalBreakdown = Object.entries(
+    posts.reduce((acc, p) => {
+      const vessel = vessels.find(v => v.code === p.vesselCode);
+      const region = vessel ? vessel.homePort : 'Chưa xác định cảng';
+      if (!acc[region]) acc[region] = { kg: 0, vesselCodes: new Set() };
+      acc[region].kg += p.estimatedQuantityKg;
+      acc[region].vesselCodes.add(p.vesselCode);
+      return acc;
+    }, {})
+  )
+    .map(([region, data]) => ({
+      region,
+      kg: data.kg,
+      vesselCount: data.vesselCodes.size
+    }))
+    .sort((a, b) => b.kg - a.kg);
+
   return (
     <div className="page-section">
-      
 
+      <div className="page-header">
+        <h2 className="page-header-title">Thống Kê & Hiệu Quả Giao Thương</h2>
+        <p className="page-header-desc">Sản lượng, doanh thu và cơ cấu giao dịch tổng hợp từ dữ liệu thực tế trên hệ thống.</p>
+      </div>
 
       {/* Analytics KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-v">
@@ -57,45 +105,26 @@ export default function AnalyticsView({ posts, orders }) {
           </div>
 
           <div className="stack-v text-sm">
-            <div>
-              <div className="flex justify-between text-slate-700 mb-2">
-                <span className="font-medium">Cá Ngừ Vây Vàng (Ocean Yellowfin Tuna)</span>
-                <span className="font-mono font-bold text-sky-600">42% (980 kg)</span>
-              </div>
-              <div className="progress-track">
-                <div className="progress-fill bg-sky-500" style={{ width: '42%' }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-slate-700 mb-2">
-                <span className="font-medium">Cá Thu Thuận Hải</span>
-                <span className="font-mono font-bold text-emerald-600">28% (650 kg)</span>
-              </div>
-              <div className="progress-track">
-                <div className="progress-fill bg-emerald-500" style={{ width: '28%' }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-slate-700 mb-2">
-                <span className="font-medium">Mực Lá & Mực Ống Đại Dương</span>
-                <span className="font-mono font-bold text-amber-600">18% (420 kg)</span>
-              </div>
-              <div className="progress-track">
-                <div className="progress-fill bg-amber-500" style={{ width: '18%' }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-slate-700 mb-2">
-                <span className="font-medium">Tôm Hùm Bông & Cua Biển Cà Mau</span>
-                <span className="font-mono font-bold text-rose-600">12% (280 kg)</span>
-              </div>
-              <div className="progress-track">
-                <div className="progress-fill bg-rose-500" style={{ width: '12%' }} />
-              </div>
-            </div>
+            {categoryBreakdown.length === 0 ? (
+              <p className="text-slate-500 text-sm">Chưa có bài đăng nào để thống kê.</p>
+            ) : (
+              categoryBreakdown.map((item, idx) => (
+                <div key={item.category}>
+                  <div className="flex justify-between text-slate-700 mb-2">
+                    <span className="font-medium">{item.label}</span>
+                    <span className={`font-mono font-bold ${CATEGORY_TEXT_COLORS[idx % CATEGORY_TEXT_COLORS.length]}`}>
+                      {item.pct.toFixed(0)}% ({item.kg.toLocaleString()} kg)
+                    </span>
+                  </div>
+                  <div className="progress-track">
+                    <div
+                      className={`progress-fill ${CATEGORY_COLORS[idx % CATEGORY_COLORS.length]}`}
+                      style={{ width: `${item.pct}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -108,29 +137,21 @@ export default function AnalyticsView({ posts, orders }) {
           </div>
 
           <div className="space-y-3">
-            <div className="glass-card flex justify-between items-center">
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm">Vùng biển Vũng Tàu - Cát Lở</h4>
-                <p className="text-xs text-slate-500 mt-1">18 Tàu đang hoạt động</p>
-              </div>
-              <span className="font-mono text-base font-bold text-sky-600">1.25 Tấn</span>
-            </div>
-
-            <div className="glass-card flex justify-between items-center">
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm">Vùng biển Phú Quốc - Kiên Giang</h4>
-                <p className="text-xs text-slate-500 mt-1">12 Tàu đang hoạt động</p>
-              </div>
-              <span className="font-mono text-base font-bold text-emerald-600">0.95 Tấn</span>
-            </div>
-
-            <div className="glass-card flex justify-between items-center">
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm">Vùng biển Phan Thiết - Bình Thuận</h4>
-                <p className="text-xs text-slate-500 mt-1">14 Tàu đang hoạt động</p>
-              </div>
-              <span className="font-mono text-base font-bold text-amber-600">0.82 Tấn</span>
-            </div>
+            {regionalBreakdown.length === 0 ? (
+              <p className="text-slate-500 text-sm">Chưa có dữ liệu vùng biển.</p>
+            ) : (
+              regionalBreakdown.map((item, idx) => (
+                <div key={item.region} className="glass-card flex justify-between items-center">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">{item.region}</h4>
+                    <p className="text-xs text-slate-500 mt-1">{item.vesselCount} Tàu đang hoạt động</p>
+                  </div>
+                  <span className={`font-mono text-base font-bold ${REGION_TEXT_COLORS[idx % REGION_TEXT_COLORS.length]}`}>
+                    {(item.kg / 1000).toFixed(2)} Tấn
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

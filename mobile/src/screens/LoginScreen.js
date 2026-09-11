@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { API_LOGIN_URL } from '../config/api';
+import { colors } from '../theme';
 
 export default function LoginScreen({ navigation }) {
   const [phone, setPhone] = useState('');
@@ -62,7 +63,7 @@ export default function LoginScreen({ navigation }) {
       >
         <View style={styles.headerContainer}>
           <View style={styles.logoCircle}>
-            <Ionicons name="boat" size={48} color="#ffffff" />
+            <Ionicons name="boat" size={48} color={colors.textOnPrimary} />
           </View>
           <Text style={styles.title}>SeaTrade AI</Text>
           <Text style={styles.subtitle}>Kết nối Hàng hải & Giao thương</Text>
@@ -70,7 +71,7 @@ export default function LoginScreen({ navigation }) {
 
         <View style={styles.formContainer}>
           <View style={styles.inputGroup}>
-            <Ionicons name="call-outline" size={20} color="#64748b" style={styles.inputIcon} />
+            <Ionicons name="call-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="Số điện thoại"
@@ -82,7 +83,7 @@ export default function LoginScreen({ navigation }) {
           </View>
 
           <View style={styles.inputGroup}>
-            <Ionicons name="lock-closed-outline" size={20} color="#64748b" style={styles.inputIcon} />
+            <Ionicons name="lock-closed-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="Mật khẩu"
@@ -100,7 +101,7 @@ export default function LoginScreen({ navigation }) {
               <Ionicons
                 name={keepLoggedIn ? 'checkbox' : 'square-outline'}
                 size={22}
-                color={keepLoggedIn ? '#0ea5e9' : '#94a3b8'}
+                color={keepLoggedIn ? colors.primaryLight : colors.textFaint}
               />
               <Text style={styles.checkboxText}>Duy trì đăng nhập</Text>
             </TouchableOpacity>
@@ -130,46 +131,121 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  content: { flex: 1, padding: 24, justifyContent: 'center' },
-  headerContainer: { alignItems: 'center', marginBottom: 48 },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  content: {
+    flex: 1,
+    padding: 24,
+    justifyContent: 'center',
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 48,
+  },
   logoCircle: {
-    width: 96, height: 96, borderRadius: 48,
-    backgroundColor: '#0ea5e9',
-    justifyContent: 'center', alignItems: 'center', marginBottom: 16,
-    shadowColor: '#0ea5e9', shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3, shadowRadius: 15, elevation: 8,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: colors.textMuted,
   },
   title: { fontSize: 28, fontWeight: 'bold', color: '#0f172a', marginBottom: 8 },
   subtitle: { fontSize: 16, color: '#64748b' },
   formContainer: {
-    backgroundColor: '#ffffff', padding: 24, borderRadius: 24,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
+    backgroundColor: colors.card,
+    padding: 24,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   inputGroup: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#f1f5f9', borderRadius: 12,
     marginBottom: 16, paddingHorizontal: 16,
   },
-  inputIcon: { marginRight: 12 },
-  input: { flex: 1, height: 52, fontSize: 16, color: '#0f172a' },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    height: 52,
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkboxText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  forgotText: { 
+    fontSize: 14, 
+    color: colors.primaryLight, 
+    fontWeight: '600' 
+  },
   rowBetween: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: 24, marginTop: 4,
+    flexDirection: 'row', 
+    alignItems: 'center',
+    justifyContent: 'space-between', 
+    marginBottom: 32, // Cách xa nút đăng nhập một chút
+    marginTop: 8,
   },
-  checkboxContainer: { flexDirection: 'row', alignItems: 'center' },
-  checkboxText: { marginLeft: 8, fontSize: 14, color: '#475569' },
-  forgotText: { fontSize: 14, color: '#0ea5e9', fontWeight: '600' },
   loginBtn: {
-    backgroundColor: '#0ea5e9', height: 56, borderRadius: 16,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#0ea5e9', shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
+    backgroundColor: colors.primary,
+    height: 56,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  loginBtnDisabled: { backgroundColor: '#7dd3fc', elevation: 0 },
-  loginBtnText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold', letterSpacing: 1 },
-  footerContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 32 },
-  footerText: { color: '#64748b', fontSize: 15 },
-  registerText: { color: '#0ea5e9', fontSize: 15, fontWeight: 'bold', marginLeft: 6 },
+  loginBtnText: {
+    color: colors.textOnPrimary,
+    fontSize: 16,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  footerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 32,
+  },
+  footerText: {
+    color: colors.textMuted,
+    fontSize: 15,
+  },
+  registerText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginLeft: 6,
+  }
 });
