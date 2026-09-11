@@ -3,15 +3,17 @@ import { StyleSheet, View, Text, TextInput, TouchableOpacity, KeyboardAvoidingVi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../context/AuthContext';
+import { API_REGISTER_URL } from '../config/api';
 import { colors } from '../theme';
 
-export default function RegisterScreen({ navigation, route }) {
+export default function RegisterScreen({ navigation }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('fisherman'); // fisherman or trader
-  
-  const { onLogin } = route.params;
+  const [role, setRole] = useState('fisherman');
+
+  const { handleLogin } = useAuth();
 
   const handleRegister = async () => {
     if (!name || !phone || !password) {
@@ -21,29 +23,31 @@ export default function RegisterScreen({ navigation, route }) {
 
     try {
       // Gọi API Đăng ký đến Backend Server
-      const response = await fetch('http://172.16.240.188:5000/api/register', {
+      const response = await fetch(API_REGISTER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone, password, role })
+        body: JSON.stringify({ full_name: name, phone, password, role: role.toUpperCase() })
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        Alert.alert('Đăng ký thất bại', data.error || 'Có lỗi xảy ra.');
+        Alert.alert('Đăng ký thất bại', data.message || 'Có lỗi xảy ra.');
         return;
       }
 
-      const { token, user } = data;
+      const { metadata } = data;
+      const token = metadata?.token;
+      const user = metadata?.user;
 
       // Lưu thông tin vĩnh viễn vào thiết bị
       await AsyncStorage.setItem('userToken', token);
       await AsyncStorage.setItem('userData', JSON.stringify(user));
-      
+
       Alert.alert(
-        'Thành công', 
+        'Thành công',
         'Đăng ký tài khoản thành công! Tự động đăng nhập...',
-        [{ text: 'OK', onPress: () => onLogin(token) }]
+        [{ text: 'OK', onPress: () => handleLogin(token) }]
       );
     } catch (e) {
       Alert.alert('Lỗi hệ thống', 'Không thể kết nối đến máy chủ. ' + e.message);
@@ -58,7 +62,7 @@ export default function RegisterScreen({ navigation, route }) {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.content}
       >
@@ -70,7 +74,7 @@ export default function RegisterScreen({ navigation, route }) {
             {/* Chọn Role */}
             <Text style={styles.sectionTitle}>Bạn là ai?</Text>
             <View style={styles.roleContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.roleCard, role === 'fisherman' && styles.roleCardActive]}
                 onPress={() => setRole('fisherman')}
               >
@@ -78,7 +82,7 @@ export default function RegisterScreen({ navigation, route }) {
                 <Text style={[styles.roleText, role === 'fisherman' && styles.roleTextActive]}>Ngư Dân</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.roleCard, role === 'trader' && styles.roleCardActive]}
                 onPress={() => setRole('trader')}
               >

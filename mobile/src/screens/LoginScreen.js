@@ -1,27 +1,31 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../context/AuthContext';
+import { API_LOGIN_URL } from '../config/api';
 import { colors } from '../theme';
 
-export default function LoginScreen({ navigation, route }) {
+export default function LoginScreen({ navigation }) {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [keepLoggedIn, setKeepLoggedIn] = useState(true); // Mặc định luôn giữ đăng nhập cho đi biển
+  const [showPassword, setShowPassword] = useState(false);
+  const [keepLoggedIn, setKeepLoggedIn] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  // Hàm này được truyền từ AppNavigator qua route.params để thay đổi state xác thực của toàn app
-  const { onLogin } = route.params;
+  // Lấy handleLogin từ Context, không cần route.params nữa
+  const { handleLogin } = useAuth();
 
-  const handleLogin = async () => {
+  const handleSubmit = async () => {
     if (!phone || !password) {
       Alert.alert('Lỗi', 'Vui lòng nhập số điện thoại và mật khẩu.');
       return;
     }
 
     try {
-      // Gọi API đến Backend Server nội bộ
-      const response = await fetch('http://172.16.240.188:5000/api/login', {
+      setLoading(true);
+      const response = await fetch(API_LOGIN_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, password })
@@ -30,20 +34,24 @@ export default function LoginScreen({ navigation, route }) {
       const data = await response.json();
 
       if (!response.ok) {
-        Alert.alert('Đăng nhập thất bại', data.error || 'Có lỗi xảy ra.');
+        Alert.alert('Đăng nhập thất bại', data.message || 'Có lỗi xảy ra.');
         return;
       }
 
-      const { token, user } = data;
+      const { metadata } = data;
+      const token = metadata?.token;
+      const user = metadata?.user;
 
       if (keepLoggedIn) {
         await AsyncStorage.setItem('userToken', token);
         await AsyncStorage.setItem('userData', JSON.stringify(user));
       }
 
-      onLogin(token);
+      handleLogin(token);
     } catch (e) {
       Alert.alert('Lỗi hệ thống', 'Không thể kết nối đến máy chủ. ' + e.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -66,7 +74,7 @@ export default function LoginScreen({ navigation, route }) {
             <Ionicons name="call-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Số điện thoại / ID Tàu"
+              placeholder="Số điện thoại"
               keyboardType="phone-pad"
               value={phone}
               onChangeText={setPhone}
@@ -79,26 +87,35 @@ export default function LoginScreen({ navigation, route }) {
             <TextInput
               style={styles.input}
               placeholder="Mật khẩu"
-              secureTextEntry
+              secureTextEntry={!showPassword}
               value={password}
               onChangeText={setPassword}
             />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.rowBetween}>
+            <TouchableOpacity style={styles.checkboxContainer} onPress={() => setKeepLoggedIn(!keepLoggedIn)}>
+              <Ionicons
+                name={keepLoggedIn ? 'checkbox' : 'square-outline'}
+                size={22}
+                color={keepLoggedIn ? colors.primaryLight : colors.textFaint}
+              />
+              <Text style={styles.checkboxText}>Duy trì đăng nhập</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
+              <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={() => setKeepLoggedIn(!keepLoggedIn)}
+            style={[styles.loginBtn, loading && styles.loginBtnDisabled]}
+            onPress={handleSubmit}
+            disabled={loading}
           >
-            <Ionicons
-              name={keepLoggedIn ? "checkbox" : "square-outline"}
-              size={24}
-              color={keepLoggedIn ? colors.primary : colors.textFaint}
-            />
-            <Text style={styles.checkboxText}>Duy trì đăng nhập</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-            <Text style={styles.loginBtnText}>ĐĂNG NHẬP</Text>
+            <Text style={styles.loginBtnText}>{loading ? 'ĐANG ĐĂNG NHẬP...' : 'ĐĂNG NHẬP'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -151,6 +168,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textMuted,
   },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#0f172a', marginBottom: 8 },
+  subtitle: { fontSize: 16, color: '#64748b' },
   formContainer: {
     backgroundColor: colors.card,
     padding: 24,
@@ -162,12 +181,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   inputGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#f1f5f9', borderRadius: 12,
+    marginBottom: 16, paddingHorizontal: 16,
   },
   inputIcon: {
     marginRight: 12,
@@ -181,13 +197,23 @@ const styles = StyleSheet.create({
   checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
-    marginTop: 8,
   },
   checkboxText: {
     marginLeft: 8,
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  forgotText: { 
+    fontSize: 14, 
+    color: colors.primaryLight, 
+    fontWeight: '600' 
+  },
+  rowBetween: {
+    flexDirection: 'row', 
+    alignItems: 'center',
+    justifyContent: 'space-between', 
+    marginBottom: 32, // Cách xa nút đăng nhập một chút
+    marginTop: 8,
   },
   loginBtn: {
     backgroundColor: colors.primary,

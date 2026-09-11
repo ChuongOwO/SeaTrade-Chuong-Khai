@@ -1,0 +1,62 @@
+const express = require('express');
+const path = require('path');
+const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
+const env = require('./config/env');
+const pool = require('./config/database');
+const errorMiddleware = require('./middleware/error.middleware');
+const authRoutes = require('./modules/auth/auth.routes');
+const vesselRoutes = require('./modules/vessels/vessel.routes');
+const speciesRoutes = require('./modules/seafood/species.routes');
+const batchRoutes = require('./modules/seafood/batch.routes');
+const imageRoutes = require('./modules/seafood/image.routes');
+const aiRoutes = require('./modules/ai/ai.routes');
+
+const app = express();
+
+// Middlewares
+app.use(cors());
+app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Swagger API Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// API Health Check
+app.get('/api/health', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT NOW()');
+    res.json({
+      status: 200,
+      message: 'Seafood Trading API is running',
+      metadata: {
+        database: 'connected',
+        timestamp: result.rows[0].now
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 500,
+      message: 'Seafood Trading API is running but Database connection failed',
+      error: err.message
+    });
+  }
+});
+
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/vessels', vesselRoutes);
+app.use('/api/seafood/species', speciesRoutes);
+app.use('/api/seafood/batches', batchRoutes);
+app.use('/api/seafood/images', imageRoutes);
+app.use('/api/ai/detections', aiRoutes);
+
+// Global Error Handler
+app.use(errorMiddleware);
+
+// Start Server
+app.listen(env.port, () => {
+  console.log(`🚀 Seafood Trading Backend is running on http://localhost:${env.port}`);
+  console.log(`👉 Health check: http://localhost:${env.port}/api/health`);
+});
