@@ -1,95 +1,91 @@
-# Thiết kế Database — SeaTrade AI (bản hợp nhất chính thức)
+# Thiết kế Database — SeaTrade AI
 
-Cập nhật: 04/09/2026. Đây là bản schema **dùng xuyên suốt cho toàn dự án** (web
-admin, mobile app, backend, AI service), thay thế cho cả hai bản nháp trước đó:
+**Cập nhật: 12/09/2026 — schema THẬT đã xác nhận khớp 100% với sơ đồ ERD, đã
+chạy qua Flyway migration, đang là schema thực tế trên database chạy thật.**
 
-1. Bản nháp ban đầu (22/08/2026) — bám sát `web/src/data/mockData.js`, chỉ có
-   9 bảng, đủ dùng cho UI hiện tại nhưng chưa bao quát toàn bộ nghiệp vụ.
-2. Bản do đồng đội phụ trách AI/backend thiết kế — 18 bảng, bao quát đầy đủ
-   nghiệp vụ hơn nhiều (AI detection theo bounding box, tách batch khỏi
-   listing, đàm phán nhiều vòng, giao hàng, thanh toán, đánh giá, thông báo).
+## Schema nào là chính thức?
 
-Bản này **giữ lại toàn bộ phần nghiệp vụ đầy đủ của bản (2)** làm khung chính
-(vì nó phản ánh đúng hướng backend thật đang xây), đồng thời sửa/bổ sung vài
-điểm kỹ thuật đã thống nhất với người dùng ngày 04/09/2026:
+**`full_schema_dongdoi.sql` là schema duy nhất đang được dùng thật** — do đồng
+đội phụ trách AI/backend thiết kế và đã có sẵn trên database thật của nhóm.
+File này được sao chép thành `back-end/migrations/V1__init_schema.sql` và chạy
+qua Flyway (`npm run db:migrate` trong `back-end/`) để tạo toàn bộ 18 bảng +
+12 enum type + trigger tự cập nhật `updated_at`. Toàn bộ code back-end
+(`back-end/src/modules/*`) viết theo đúng tên bảng/cột của file này.
 
-| Quyết định | Chọn | Vì sao |
-|---|---|---|
-| Phạm vi | Đầy đủ toàn bộ nghiệp vụ | Dùng lâu dài, không phải thiết kế lại khi web/mobile làm thêm tính năng (thanh toán, đánh giá,...) |
-| Tọa độ vị trí | PostGIS `GEOGRAPHY(Point,4326)` | Query khoảng cách / tàu gần nhất ngay trong Postgres, khớp tính năng bản đồ hàng hải |
-| Cột trạng thái | `VARCHAR + CHECK` | Thêm giá trị trạng thái mới chỉ cần sửa CHECK, không cần `ALTER TYPE` như ENUM gốc của Postgres |
+Đã kiểm tra đối chiếu từng bảng, từng cột, từng kiểu dữ liệu giữa
+`full_schema_dongdoi.sql` và sơ đồ ERD do nhóm vẽ — khớp chính xác 100%,
+không lệch cột nào.
 
-*(Ghi chú CommonMark yêu cầu dòng trống trước bảng — xem file gốc.)*
+## `schema.sql` — ĐÃ NGƯNG DÙNG, đừng chạy hay tham chiếu file này nữa
 
-## Những gì lấy từ bản đồng đội (giữ nguyên tinh thần thiết kế)
+Bản `schema.sql` (và `seed.sql`, `erd.png`, `erd.py`, `erd.dbml` liên quan tới
+nó) là **bản nháp cũ** tôi từng cùng thiết kế khi CHƯA biết đồng đội đã có sẵn
+schema thật trên database đang chạy. Bản nháp này dùng:
 
-- Tách **`catch_batches`** (mẻ cá vừa đánh bắt) khỏi **`listings`** (tin đăng
-  bán) — một mẻ có thể sinh nhiều tin đăng hoặc bán một phần.
-- **`ai_detections`** lưu theo từng ảnh với tọa độ bounding box
-  (`bbox_x/y/width/height`) và `model_version` — khớp với cách một model
-  computer vision thật trả kết quả, thay vì gắn phẳng lên listing.
-- **`listing_offers`** có `parent_offer_id` tự tham chiếu — hỗ trợ trả giá
-  qua lại nhiều vòng giữa buyer/seller.
-- **`order_items`** tách khỏi `orders` — một đơn có thể gồm nhiều dòng hàng
-  (nhiều tin đăng khác nhau gộp vào 1 đơn).
-- Bổ sung đầy đủ **`deliveries`** (điểm hẹn giao nhận trên biển),
-  **`payments`**, **`reviews`** (đánh giá 2 chiều buyer↔seller),
-  **`notifications`**, **`conversations`/`messages`**.
+- `VARCHAR + CHECK` cho các cột trạng thái thay vì Postgres `ENUM` thật.
+- Tên bảng khác: `catch_batches` (thay vì `seafood_batches`), `listings`
+  (thay vì `seafood_listings`), `listing_offers` (thay vì `offers`).
+- Có thêm các cột/bảng mà bản thật KHÔNG có: `client_id`, `deleted_at`,
+  `species_grades`, `idempotency_keys`.
 
-## Những gì sửa/bổ sung so với bản đồng đội
+Sau khi tìm ra file `full_schema_dongdoi.sql` (đồng đội gửi qua Messenger,
+xem lại đoạn hội thoại "Conversation á") và đối chiếu với database thật đang
+chạy, xác nhận **`schema.sql` không khớp thực tế** và không được dùng ở đâu
+trong code. Giữ lại file này (và `seed.sql`, `erd.png`, `erd.py`, `erd.dbml`)
+chỉ để biết lịch sử quá trình thiết kế, **không chạy, không tham chiếu khi
+code hay khi viết báo cáo đồ án** — mọi thứ liên quan tới cấu trúc database
+trong báo cáo phải lấy từ `full_schema_dongdoi.sql` hoặc sơ đồ ERD mới (xem
+mục dưới).
 
-- **`VARCHAR + CHECK` thay vì Postgres ENUM** cho mọi cột trạng thái
-  (`vessel_status`, `order_status`,...) — lý do đã nêu ở bảng trên.
-- **PostGIS `GEOGRAPHY`** áp dụng nhất quán ở mọi nơi có tọa độ (`vessels`,
-  `vessel_locations`, `catch_batches`, `listings`, `deliveries`) — bản đồng
-  đội đã dùng nhưng chưa đồng bộ 100% ở mọi bảng.
-- Thêm **`client_id`** (UUID) trên các bảng mobile có thể tạo lúc offline
-  (`users`, `vessels`, `catch_batches`, `listings`, `orders`, `messages`) và
-  bảng **`idempotency_keys`** — chuẩn bị cho tính năng đồng bộ khi mất mạng
-  giữa biển (mobile app hiện đã gọi API thật, cần tính đến trường hợp mạng
-  chập chờn ở ngoài khơi).
-- Thêm **`deleted_at`** (soft delete) trên `users`, `vessels`, `listings` —
-  tránh xoá cứng dữ liệu đã phát sinh giao dịch.
-- Giữ lại **`species_grades`** (hạng A/B/C theo từng loài, có
-  `price_multiplier`) và **`species.ai_label`** (cầu nối nhãn thô model AI ↔
-  loài trong danh mục) từ bản nháp ban đầu — hai bảng này khớp trực tiếp với
-  tính năng đang hiển thị trên `AIVisionPlayground.jsx` (giá theo hạng) mà
-  bản đồng đội chưa có.
-- Đổi tên `boats` → **`vessels`** để khớp đúng tên biến `INITIAL_VESSELS`
-  đang dùng trong `mockData.js` của web, giảm công đổi tên khi nối API thật.
+`chat_schema.sql` cũng đã ngưng dùng vì lý do tương tự (bản đoán cấu trúc
+bảng `conversations`/`messages` trước khi biết bản thật) — xem chú thích ngay
+trong file đó.
 
-## Đã kiểm thử
+## Sơ đồ ERD hiện tại — bản nào đúng?
 
-- `schema.sql` đã chạy thử thành công trên PostgreSQL 16 (dùng kiểu `point`
-  thay `geography` để kiểm tra cú pháp offline do môi trường không cài được
-  extension PostGIS — phần `GEOGRAPHY`/`GIST` dùng đúng cú pháp chuẩn của
-  PostGIS, cần cài `CREATE EXTENSION postgis;` khi chạy trên server thật).
-- `seed.sql` chạy thành công toàn bộ luồng mẫu: user đăng ký → tàu đánh bắt →
-  chụp ảnh AI nhận diện → đăng tin → đàm phán → tạo đơn → hẹn giao hàng →
-  thanh toán → đánh giá → nhắn tin/thông báo.
-- Cột generated (`listings.total_value`, `order_items.subtotal`) đã kiểm tra
-  tính đúng giá trị.
+Sơ đồ `database/erd.png` trong repo (sinh từ `erd.py`) vẽ theo `schema.sql`
+cũ nên **không còn khớp** với database thật nữa (sai tên bảng, sai cột như
+nêu trên).
 
-## Câu hỏi còn mở — cần thống nhất với đồng đội trước khi chốt hẳn
+Sơ đồ ERD mới (18 bảng: `seafood_species`, `users`, `price_history`,
+`notifications`, `vessels`, `vessel_locations`, `seafood_batches`,
+`seafood_images`, `ai_detections`, `seafood_listings`, `offers`,
+`conversations`, `messages`, `order_items`, `orders`, `deliveries`,
+`payments`, `reviews`) đã được đối chiếu và khớp chính xác 100% với
+`full_schema_dongdoi.sql` — đây mới là sơ đồ nên dùng cho báo cáo đồ án.
 
-1. Server Postgres thật của nhóm có bật được extension `postgis` không? Nếu
-   hosting không hỗ trợ (một số gói free-tier không cho cài extension ngoài
-   danh sách mặc định), cần đổi lại `GEOGRAPHY` → `DOUBLE PRECISION` lat/lng
-   thường và tính khoảng cách ở tầng ứng dụng.
-2. `orders.total_amount` là tổng nhiều `order_items` nên **không** dùng được
-   generated column (Postgres không cho generated column tham chiếu bảng
-   khác) — cần thống nhất ai (backend hay trigger DB) chịu trách nhiệm cập
-   nhật cột này mỗi khi `order_items` thay đổi.
-3. `vessels.owner_id NOT NULL` — cần user tồn tại trước khi tạo tàu, cần
-   thống nhất thứ tự luồng đăng ký.
-4. Chưa có bảng phân quyền chi tiết cho Web Admin — `role = 'admin'` hiện có
+**TODO:** thay `database/erd.png` bằng sơ đồ mới này (và cân nhắc xóa/gộp
+`erd.py`, `erd.dbml` nếu chúng sinh ra bản cũ) để tránh 2 sơ đồ mâu thuẫn
+nhau tồn tại song song trong repo.
+
+## Quản lý version schema — dùng Flyway, không sửa tay
+
+Từ 17/08/2026, mọi thay đổi schema đi qua Flyway (xem `back-end/README.md`
+mục 2), không sửa tay trực tiếp trên database và không sửa lại
+`full_schema_dongdoi.sql`/`V1__init_schema.sql` đã chạy rồi. Muốn thêm/sửa
+bảng, cột: tạo file `back-end/migrations/V2__...sql` mới rồi chạy
+`npm run db:migrate`.
+
+## Cấu trúc file trong thư mục này
+
+- `full_schema_dongdoi.sql` — **schema thật, chính thức**, bản sao y hệt
+  `back-end/migrations/V1__init_schema.sql`.
+- `chat_schema.sql` — đã ngưng dùng (xem chú thích trong file).
+- `schema.sql`, `seed.sql`, `erd.png`, `erd.py`, `erd.dbml` — bản nháp cũ, đã
+  ngưng dùng, giữ lại chỉ để biết lịch sử (xem mục "ĐÃ NGƯNG DÙNG" ở trên).
+- `architecture.png`, `architecture.py`, `a.md` — tài liệu kiến trúc hệ
+  thống nói chung, chưa rà soát lại trong lần cập nhật này — cần kiểm tra
+  riêng xem có phần nào mô tả sai theo schema cũ hay không trước khi dùng cho
+  báo cáo.
+
+## Câu hỏi còn mở
+
+1. Đã xác nhận extension `postgis` cài được trên máy chạy database thật
+   (đã cài qua Stack Builder — xem `back-end/README.md`). Nếu deploy lên
+   server/hosting khác sau này, cần kiểm tra lại extension này có sẵn không.
+2. Chưa có bảng phân quyền chi tiết cho Web Admin — `role = 'ADMIN'` hiện có
    toàn quyền, giữ đơn giản cho MVP.
-5. Backend dùng ORM nào (SQLAlchemy nếu FastAPI, Prisma/Sequelize nếu Node)
-   để map đúng các generated column, GEOGRAPHY, và CHECK constraint ở trên.
-
-## Cấu trúc file
-
-- `schema.sql` — toàn bộ DDL (20 bảng, PostgreSQL 14+).
-- `seed.sql` — dữ liệu mẫu, chạy được ngay sau `schema.sql`.
-- `erd.png` — sơ đồ ERD trực quan (5 nhóm màu theo chức năng).
-- `erd.py` — script sinh `erd.png` (matplotlib, tự layout theo cột).
+3. Phần lớn bảng nghiệp vụ trade (`seafood_listings`, `orders`, `order_items`,
+   `payments`, `deliveries`, `reviews`, `offers`, `price_history`) đã có
+   trong database nhưng **chưa có API back-end nào dùng tới** — mới chỉ
+   `conversations`/`messages` (chat) và `notifications` được tận dụng.
