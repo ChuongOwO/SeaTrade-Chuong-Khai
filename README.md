@@ -96,7 +96,6 @@ cd f:\Do-an-tot-nghiep\mobile
 # 2. Chạy ứng dụng trên thiết bị ảo hoặc máy thật (quét mã QR)
 npm run start
 ```
-
 ---
 
 ## 4. HƯỚNG DẪN VẬN HÀNH WEB ADMIN DASHBOARD

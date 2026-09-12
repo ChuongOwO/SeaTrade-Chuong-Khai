@@ -21,12 +21,19 @@ import {
   Filter,
   CheckCircle2,
   Sliders,
-  Award
+  Award,
+  MessageCircle
 } from 'lucide-react';
 import { SEAFOOD_SPECIES } from '../data/mockData';
+import ChatPanel from './ChatPanel';
 
-export default function MobileAppSimulator({ posts, setPosts, vessels, orders, setOrders, offlineMode, activeRole, setActiveRole }) {
+export default function MobileAppSimulator({ posts, setPosts, vessels, orders, setOrders, offlineMode, activeRole, setActiveRole, currentUser }) {
   const [mobileTab, setMobileTab] = useState('HOME'); // 'HOME', 'SCAN_POST', 'ORDERS'
+
+  // Màn "Lịch Sử" (mobileTab === 'ORDERS') chia làm 2 tab con theo yêu cầu của đồng đội:
+  // 1 tab Giao dịch (nội dung cũ, giữ nguyên) + 1 tab Chat (mới, xem ChatPanel.jsx).
+  const [historySubTab, setHistorySubTab] = useState('TRANSACTIONS'); // 'TRANSACTIONS' | 'CHAT'
+  const [selectedChatOrder, setSelectedChatOrder] = useState(null);
   
   // Fisherman Mode State: AI Scanning & Post Creation
   const [selectedSamplePhoto, setSelectedSamplePhoto] = useState(SEAFOOD_SPECIES[0]);
@@ -503,35 +510,89 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-cyan-400" /> Lịch Sử Giao Dịch
+                  <Clock className="w-4 h-4 text-cyan-400" /> Lịch Sử
                 </h3>
-                <button onClick={() => setMobileTab('HOME')} className="text-slate-400 hover:text-white text-xs">Đóng</button>
+                <button
+                  onClick={() => { setMobileTab('HOME'); setSelectedChatOrder(null); }}
+                  className="text-slate-400 hover:text-white text-xs"
+                >
+                  Đóng
+                </button>
               </div>
 
-              {orders.length === 0 ? (
-                <div className="p-6 text-center text-slate-400 text-xs">Chưa có đơn hàng nào được chốt.</div>
-              ) : (
-                orders.map((order) => (
-                  <div key={order.id} className="glass-panel p-3 space-y-2 border-slate-800">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-cyan-300 text-xs font-bold">{order.id}</span>
-                      <span className={`badge-sm ${
-                        order.status === 'COMPLETED' ? 'badge-emerald' :
-                        order.status === 'IN_TRANSIT' ? 'badge-cyan' : 'badge-amber'
-                      }`}>
-                        {order.status === 'COMPLETED' ? 'Hoàn tất' : order.status === 'IN_TRANSIT' ? 'Đang giao' : 'Đã hủy'}
-                      </span>
+              {/* Góc trên: 2 tab Giao dịch / Chat (theo yêu cầu của đồng đội) */}
+              <div className="flex gap-1.5 p-1 bg-slate-900/80 border border-slate-800 rounded-xl">
+                <button
+                  onClick={() => { setHistorySubTab('TRANSACTIONS'); setSelectedChatOrder(null); }}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    historySubTab === 'TRANSACTIONS' ? 'bg-cyan-600 text-white' : 'text-slate-400'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" /> Giao dịch
+                </button>
+                <button
+                  onClick={() => { setHistorySubTab('CHAT'); setSelectedChatOrder(null); }}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    historySubTab === 'CHAT' ? 'bg-cyan-600 text-white' : 'text-slate-400'
+                  }`}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" /> Chat
+                </button>
+              </div>
+
+              {historySubTab === 'TRANSACTIONS' && (
+                orders.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-xs">Chưa có đơn hàng nào được chốt.</div>
+                ) : (
+                  orders.map((order) => (
+                    <div key={order.id} className="glass-panel p-3 space-y-2 border-slate-800">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-cyan-300 text-xs font-bold">{order.id}</span>
+                        <span className={`badge-sm ${
+                          order.status === 'COMPLETED' ? 'badge-emerald' :
+                          order.status === 'IN_TRANSIT' ? 'badge-cyan' : 'badge-amber'
+                        }`}>
+                          {order.status === 'COMPLETED' ? 'Hoàn tất' : order.status === 'IN_TRANSIT' ? 'Đang giao' : 'Đã hủy'}
+                        </span>
+                      </div>
+                      <p className="text-white font-semibold text-xs">{order.speciesName} • {order.quantityKg} kg</p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400">
+                        <span className="truncate">{order.sellerName} → {order.buyerName}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500">{order.timestamp}</span>
+                        <span className="font-mono text-amber-400 font-bold">{order.totalAmount.toLocaleString()} đ</span>
+                      </div>
                     </div>
-                    <p className="text-white font-semibold text-xs">{order.speciesName} • {order.quantityKg} kg</p>
-                    <div className="flex items-center justify-between text-[11px] text-slate-400">
-                      <span className="truncate">{order.sellerName} → {order.buyerName}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-500">{order.timestamp}</span>
-                      <span className="font-mono text-amber-400 font-bold">{order.totalAmount.toLocaleString()} đ</span>
-                    </div>
-                  </div>
-                ))
+                  ))
+                )
+              )}
+
+              {historySubTab === 'CHAT' && (
+                selectedChatOrder ? (
+                  <ChatPanel
+                    order={selectedChatOrder}
+                    currentUser={currentUser}
+                    onClose={() => setSelectedChatOrder(null)}
+                  />
+                ) : orders.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-xs">Chưa có đơn hàng nào để trò chuyện.</div>
+                ) : (
+                  orders.map((order) => (
+                    <button
+                      key={order.id}
+                      onClick={() => setSelectedChatOrder(order)}
+                      className="w-full glass-panel p-3 space-y-1.5 border-slate-800 hover:border-cyan-500/40 text-left transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-cyan-300 text-xs font-bold">{order.id}</span>
+                        <MessageCircle className="w-3.5 h-3.5 text-slate-500" />
+                      </div>
+                      <p className="text-white font-semibold text-xs">{order.speciesName} • {order.quantityKg} kg</p>
+                      <p className="text-[11px] text-slate-400 truncate">{order.sellerName} ↔ {order.buyerName}</p>
+                    </button>
+                  ))
+                )
               )}
             </div>
           )}

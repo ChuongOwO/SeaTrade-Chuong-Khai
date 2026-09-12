@@ -12,9 +12,13 @@ import AnalyticsView from './components/AnalyticsView';
 import UserManual from './components/UserManual';
 
 import { INITIAL_POSTS, INITIAL_VESSELS, INITIAL_ORDERS } from './data/mockData';
+import { getToken } from './api/client';
+import { fetchCurrentUser, logoutAccount } from './api/auth';
+import { buildUserFromBackend } from './api/roleMeta';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(true); // đang kiểm tra token cũ lúc tải trang
   const [activeTab, setActiveTab] = useState('admin');
   const [activeRole, setActiveRole] = useState('FISHERMAN'); // vai trò trong Mobile App Simulator
   const [posts, setPosts] = useState(INITIAL_POSTS);
@@ -22,10 +26,35 @@ export default function App() {
   const [orders, setOrders] = useState(INITIAL_ORDERS);
   const [offlineMode, setOfflineMode] = useState(false);
 
+  // Nếu trình duyệt đã có JWT từ lần đăng nhập trước (localStorage), thử gọi
+  // GET /api/auth/me để đăng nhập lại tự động thay vì bắt người dùng đăng nhập lại mỗi lần F5.
   useEffect(() => {
-    // Kết nối tới Socket.IO Server Backend
+    (async () => {
+      const token = getToken();
+      if (!token) {
+        setCheckingAuth(false);
+        return;
+      }
+      try {
+        const backendUser = await fetchCurrentUser();
+        const user = buildUserFromBackend(backendUser);
+        setCurrentUser(user);
+        setActiveTab(user.defaultTab);
+        if (user.mobileRole) setActiveRole(user.mobileRole);
+      } catch {
+        // Token hết hạn/không hợp lệ -> xoá, quay lại màn đăng nhập
+        logoutAccount();
+      } finally {
+        setCheckingAuth(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    // Kết nối tới Socket.IO Server Backend (dùng cho radar vị trí tàu real-time,
+    // KHÔNG liên quan tới tính năng Chat — xem ChatPanel.jsx dùng REST polling riêng).
     const socket = io('http://localhost:5000');
-    
+
     socket.on('connect', () => {
       console.log('📡 [Web] Đã kết nối Radar Server');
     });
@@ -33,10 +62,10 @@ export default function App() {
     socket.on('vessel_location_update', (data) => {
       // Map data từ Simulator về cấu trúc vessel của Web
       // Simulator data: { vesselId, jobType, lat, lng, heading, speed, timestamp }
-      
+
       setVessels(prevVessels => {
         const existingIdx = prevVessels.findIndex(v => v.code === data.vesselId);
-        
+
         if (existingIdx >= 0) {
           // Cập nhật vị trí tàu cũ
           const updated = [...prevVessels];
@@ -82,11 +111,21 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    logoutAccount();
     setCurrentUser(null);
     setActiveTab('admin');
   };
 
-  // Chưa đăng nhập -> chỉ hiện màn hình chọn vai trò, chưa vào được hệ thống
+  // Đang kiểm tra token cũ -> tránh nháy màn đăng nhập rồi lại vào ngay
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400 text-sm">
+        Đang kiểm tra đăng nhập...
+      </div>
+    );
+  }
+
+  // Chưa đăng nhập -> chỉ hiện màn hình đăng nhập/đăng ký, chưa vào được hệ thống
   // (Đặt SAU các hook useState/useEffect ở trên để không phá quy tắc Rules of Hooks)
   if (!currentUser) {
     return <LoginScreen onLogin={handleLogin} />;
@@ -140,6 +179,7 @@ export default function App() {
             offlineMode={offlineMode}
             activeRole={activeRole}
             setActiveRole={setActiveRole}
+            currentUser={currentUser}
           />
         )}
 
