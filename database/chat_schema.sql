@@ -1,0 +1,14 @@
+-- ============================================================================
+-- ĐÃ NGƯNG DÙNG (deprecated) — ĐỪNG chạy file này.
+--
+-- File này (bản cũ) tự đoán cấu trúc bảng conversations/messages khi chưa
+-- biết đồng đội đã có sẵn thiết kế thật. Sau đó tìm ra đồng đội đã có file
+-- `full_schema_dongdoi.sql` (xem cùng thư mục database/) định nghĩa đầy đủ
+-- conversations/messages ở mục 17-18 — với tên cột KHÁC bản cũ này
+-- (buyer_id/seller_id/listing_id/order_id thay vì user_a_id/user_b_id/
+-- batch_id; cột "message" thay vì "content").
+--
+-- => Bảng chat THẬT lấy từ `full_schema_dongdoi.sql`, không phải file này.
+-- Code back-end (back-end/src/modules/chat/) đã được sửa lại để khớp đúng
+-- cấu trúc thật đó. Giữ file này lại chỉ để biết lịch sử, không cần chạy.
+-- ============================================================================

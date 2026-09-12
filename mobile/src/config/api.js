@@ -23,3 +23,7 @@ export const API_AUTH_URL = `${API_URL}/api/auth`;
 export const API_REGISTER_URL = `${API_AUTH_URL}/register`;
 export const API_LOGIN_URL = `${API_AUTH_URL}/login`;
 export const API_AVATAR_URL = `${API_AUTH_URL}/avatar`;
+
+// Chức năng Chat (back-end/src/modules/chat) — xem mobile/src/api/chatApi.js
+export const API_CHAT_CONVERSATIONS_URL = `${API_URL}/api/chat/conversations`;
+export const chatMessagesUrl = (conversationId) => `${API_CHAT_CONVERSATIONS_URL}/${conversationId}/messages`;

@@ -12,6 +12,7 @@ const speciesRoutes = require('./modules/seafood/species.routes');
 const batchRoutes = require('./modules/seafood/batch.routes');
 const imageRoutes = require('./modules/seafood/image.routes');
 const aiRoutes = require('./modules/ai/ai.routes');
+const chatRoutes = require('./modules/chat/chat.routes');
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/api/seafood/species', speciesRoutes);
 app.use('/api/seafood/batches', batchRoutes);
 app.use('/api/seafood/images', imageRoutes);
 app.use('/api/ai/detections', aiRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Global Error Handler
 app.use(errorMiddleware);

@@ -9,12 +9,8 @@
 !/web/
 !/database/
 
-<<<<<<< HEAD
 # Ngoại trừ các file tài liệu và cấu hình gốc
-=======
-# 3. Ngoại trừ các file tài liệu và cấu hình gốc
 !/README.md
->>>>>>> duy-khai
 !/HUONG_DAN_SU_DUNG.md
 !/.gitignore
 
@@ -33,6 +29,10 @@ yarn-error.*
 .DS_Store
 *.pem
 *.tsbuildinfo
+
+# Flyway CLI tự tải về (back-end/scripts/flyway.js) — vài trăm MB kèm sẵn
+# Java, mỗi máy tự tải 1 lần, không commit lên git.
+.flyway-cli/
 
 # Lockfile của package manager khác pnpm — project này chuẩn hóa dùng pnpm
 # (đã có sẵn pnpm-lock.yaml). Tránh commit lockfile song song gây lệch
