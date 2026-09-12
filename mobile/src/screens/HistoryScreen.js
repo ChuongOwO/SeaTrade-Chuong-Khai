@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme';
 import { fetchConversations, startConversation } from '../api/chatApi';
 import ChatThread from '../components/ChatThread';
+import { useNotifications } from '../context/NotificationContext';
 
 // Dữ liệu mẫu (mock) — tab "Giao dịch" chưa nối API lịch sử giao dịch thật vì
 // back-end hiện chưa có module đơn hàng (orders). Giữ nguyên như cũ, đồng đội
@@ -32,6 +33,7 @@ function formatTime(iso) {
 }
 
 export default function HistoryScreen() {
+  const { unreadCount, refresh: refreshNotifications } = useNotifications();
   const [tab, setTab] = useState('TRANSACTIONS'); // 'TRANSACTIONS' | 'CHAT'
   const [conversations, setConversations] = useState([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
@@ -125,7 +127,17 @@ export default function HistoryScreen() {
   if (activeConversation) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <ChatThread conversation={activeConversation} onBack={() => setActiveConversation(null)} />
+        <ChatThread
+          conversation={activeConversation}
+          onBack={() => {
+            setActiveConversation(null);
+            // Mở hội thoại đã tự đánh dấu tin nhắn + notification liên quan là
+            // đã đọc ở back-end (xem chat.controller.js getMessages) — refresh
+            // ngay ở đây để chấm đỏ trên sub-tab "Chat" cập nhật liền, không
+            // phải đợi tới lần poll định kỳ tiếp theo (tối đa 5s).
+            refreshNotifications();
+          }}
+        />
       </SafeAreaView>
     );
   }
@@ -154,7 +166,10 @@ export default function HistoryScreen() {
           style={[styles.tabBtn, tab === 'CHAT' && styles.tabBtnActive]}
           onPress={() => setTab('CHAT')}
         >
-          <Ionicons name="chatbubbles" size={16} color={tab === 'CHAT' ? '#fff' : colors.textMuted} />
+          <View>
+            <Ionicons name="chatbubbles" size={16} color={tab === 'CHAT' ? '#fff' : colors.textMuted} />
+            {unreadCount > 0 && <View style={styles.chatTabDot} />}
+          </View>
           <Text style={[styles.tabBtnText, tab === 'CHAT' && styles.tabBtnTextActive]}>Chat</Text>
         </TouchableOpacity>
       </View>
@@ -303,6 +318,17 @@ const styles = StyleSheet.create({
   },
   tabBtnTextActive: {
     color: '#fff',
+  },
+  chatTabDot: {
+    position: 'absolute',
+    top: -3,
+    right: -5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.danger,
+    borderWidth: 1.5,
+    borderColor: '#fff',
   },
   list: {
     padding: 16,

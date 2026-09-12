@@ -92,24 +92,62 @@ const markMessagesRead = async (conversationId, readerId) => {
      WHERE conversation_id = $1 AND sender_id <> $2 AND is_read = FALSE`,
     [conversationId, readerId]
   );
+
+  // Đồng bộ luôn thông báo "tin nhắn mới" (bảng notifications) của hội thoại
+  // này cho người vừa đọc — để chấm đỏ trên mobile (sub-tab Chat, xem
+  // mobile/src/context/NotificationContext.js) biến mất đúng lúc tin nhắn
+  // thực sự được đọc, không phải chỉ vì mở app Lịch Sử lên xem qua.
+  await pool.query(
+    `UPDATE notifications SET is_read = TRUE
+     WHERE user_id = $1 AND notification_type = 'NEW_MESSAGE' AND reference_id = $2 AND is_read = FALSE`,
+    [readerId, conversationId]
+  );
 };
 
 const createMessage = async (conversationId, senderId, message) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Lấy buyer_id/seller_id để suy ra người NHẬN (không phải người gửi), và
+    // tên người gửi để đặt tiêu đề thông báo cho thân thiện.
+    const convoResult = await client.query(
+      `SELECT c.buyer_id, c.seller_id, u.full_name AS sender_name
+       FROM conversations c, users u
+       WHERE c.id = $1 AND u.id = $2`,
+      [conversationId, senderId]
+    );
+    const convo = convoResult.rows[0];
+    if (!convo) {
+      throw new Error('Không tìm thấy hội thoại');
+    }
+    const recipientId = convo.buyer_id === senderId ? convo.seller_id : convo.buyer_id;
+
     const inserted = await client.query(
       `INSERT INTO messages (conversation_id, sender_id, message)
        VALUES ($1, $2, $3)
        RETURNING id, conversation_id, sender_id, message, is_read, created_at`,
       [conversationId, senderId, message]
     );
+
     // Bảng thật có trigger trg_conversations_updated_at BEFORE UPDATE, chỉ cần
     // chạm 1 câu UPDATE là updated_at tự set lại = CURRENT_TIMESTAMP.
     await client.query(
       'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
       [conversationId]
     );
+
+    // Tạo thông báo "có tin nhắn mới" cho người nhận, dùng bảng notifications
+    // chung có sẵn trong schema thật (mục 21 full_schema_dongdoi.sql) — xem
+    // back-end/src/modules/notifications. reference_id = conversationId để
+    // sau này (nếu làm màn danh sách thông báo) bấm vào mở đúng hội thoại;
+    // hiện tại mobile mới chỉ dùng để đếm số chưa đọc (chấm đỏ).
+    await client.query(
+      `INSERT INTO notifications (user_id, title, content, notification_type, reference_id)
+       VALUES ($1, $2, $3, 'NEW_MESSAGE', $4)`,
+      [recipientId, `Tin nhắn mới từ ${convo.sender_name}`, message, conversationId]
+    );
+
     await client.query('COMMIT');
     return inserted.rows[0];
   } catch (err) {

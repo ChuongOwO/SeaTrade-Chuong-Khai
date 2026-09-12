@@ -6,6 +6,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { TouchableOpacity } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme';
 
@@ -51,20 +52,39 @@ const CustomScanButton = ({ onPress }) => (
   </TouchableOpacity>
 );
 
+// Chấm đỏ nhỏ đè lên icon tab — dùng cho badge "có tin nhắn mới" trên tab
+// Lịch Sử (xem NotificationContext.js). Không hiện số, chỉ 1 chấm tròn.
+const TabDot = ({ borderColor }) => (
+  <View
+    style={{
+      position: 'absolute',
+      top: -2,
+      right: -6,
+      width: 9,
+      height: 9,
+      borderRadius: 5,
+      backgroundColor: colors.danger,
+      borderWidth: 1.5,
+      borderColor,
+    }}
+  />
+);
+
 // Giao diện chính (đã đăng nhập) — không cần params nữa, dùng Context
 function MainTabs() {
-  const { colors, isDarkMode } = useTheme();
+  const { colors: themeColors } = useTheme();
+  const { hasNewBanner, markHistoryTabSeen } = useNotifications();
 
   return (
     <Tab.Navigator
       screenOptions={{
         tabBarShowLabel: true,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textFaint,
+        tabBarActiveTintColor: themeColors.primary,
+        tabBarInactiveTintColor: themeColors.textFaint,
         tabBarStyle: {
-          backgroundColor: colors.card,
+          backgroundColor: themeColors.card,
           borderTopWidth: 1,
-          borderTopColor: colors.border,
+          borderTopColor: themeColors.border,
           height: 65,
           paddingBottom: 8,
           paddingTop: 8,
@@ -103,7 +123,18 @@ function MainTabs() {
         component={HistoryScreen}
         options={{
           tabBarLabel: 'Lịch Sử',
-          tabBarIcon: ({ color }) => <Ionicons name="receipt" size={24} color={color} />,
+          tabBarIcon: ({ color }) => (
+            <View>
+              <Ionicons name="receipt" size={24} color={color} />
+              {hasNewBanner && <TabDot borderColor={themeColors.card} />}
+            </View>
+          ),
+        }}
+        listeners={{
+          // Tab được xem (focus) -> tắt chấm đỏ ngoài cùng. Chấm đỏ trên
+          // sub-tab "Chat" bên trong màn Lịch Sử vẫn giữ nguyên, chỉ tắt khi
+          // tin nhắn thực sự được đọc (xem HistoryScreen.js + back-end).
+          focus: () => markHistoryTabSeen(),
         }}
       />
       <Tab.Screen

@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './src/context/AuthContext';
+import { NotificationProvider } from './src/context/NotificationContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 const AppContainer = () => {
@@ -31,11 +32,13 @@ const AppContainer = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <ThemeProvider>
-        <SafeAreaProvider>
-          <AppContainer />
-        </SafeAreaProvider>
-      </ThemeProvider>
+      <NotificationProvider>
+        <ThemeProvider>
+          <SafeAreaProvider>
+            <AppContainer />
+          </SafeAreaProvider>
+        </ThemeProvider>
+      </NotificationProvider>
     </AuthProvider>
   );
 }
