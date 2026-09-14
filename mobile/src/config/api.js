@@ -33,3 +33,8 @@ export const chatMessagesUrl = (conversationId) => `${API_CHAT_CONVERSATIONS_URL
 // mobile/src/api/notificationsApi.js + context/NotificationContext.js
 export const API_NOTIFICATIONS_URL = `${API_URL}/api/notifications`;
 export const API_NOTIFICATIONS_UNREAD_COUNT_URL = `${API_NOTIFICATIONS_URL}/unread-count`;
+
+// Tàu & vị trí GPS (back-end/src/modules/vessels) — dùng cho Bản Đồ Hải Trình.
+// GET /my-vessel lấy vessel_id của tàu mình; POST /:id/locations gửi vị trí
+// GPS thật lên định kỳ. Xem mobile/src/api/vesselsApi.js + screens/HomeScreen.js.
+export const API_VESSELS_URL = `${API_URL}/api/vessels`;

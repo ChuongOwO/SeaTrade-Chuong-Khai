@@ -7,12 +7,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { API_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchMyVessel, postVesselLocation } from '../api/vesselsApi';
 
 const SEA_CENTER = { latitude: 10.3240, longitude: 107.1240 };
+// Khoảng cách tối thiểu giữa 2 lần gửi vị trí GPS thật lên server (ms) — tránh
+// spam API vì watchPositionAsync có thể bắn sự kiện mỗi ~1 giây.
+const LOCATION_SEND_INTERVAL_MS = 15000;
 
 export default function HomeScreen() {
   const { colors, isDarkMode } = useTheme();
   const mapRef = useRef(null);
+  // vessel_id của tàu user hiện tại (lấy 1 lần từ GET /api/vessels/my-vessel) —
+  // dùng để biết gửi POST /api/vessels/:id/locations cho tàu nào.
+  const myVesselIdRef = useRef(null);
+  const lastSentAtRef = useRef(0);
 
   const [location, setLocation] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
@@ -71,6 +79,21 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, []);
 
+  // Lấy vessel_id của tàu mình (nếu đã đăng ký tàu) 1 lần khi vào màn hình —
+  // dùng để gửi vị trí GPS thật lên server (xem handleGetLocation bên dưới).
+  useEffect(() => {
+    (async () => {
+      try {
+        const vessel = await fetchMyVessel();
+        if (vessel && vessel.vessel_id) {
+          myVesselIdRef.current = vessel.vessel_id;
+        }
+      } catch (e) {
+        console.log('Không lấy được thông tin tàu của tôi:', e.message);
+      }
+    })();
+  }, []);
+
   const handleGetLocation = async () => {
     setIsLocating(true);
     try {
@@ -105,6 +128,25 @@ export default function HomeScreen() {
                 latitude: fakeLat, longitude: fakeLng, latitudeDelta: 0.2, longitudeDelta: 0.2,
               });
             }
+
+            // Gửi vị trí GPS thật lên server (throttle theo LOCATION_SEND_INTERVAL_MS)
+            // để web admin và các tàu khác thấy được tàu này đang di chuyển.
+            const now = Date.now();
+            if (myVesselIdRef.current && now - lastSentAtRef.current > LOCATION_SEND_INTERVAL_MS) {
+              lastSentAtRef.current = now;
+              const speedKnots = currentPos.coords.speed && currentPos.coords.speed > 0
+                ? parseFloat((currentPos.coords.speed * 1.94384).toFixed(1)) // m/s -> hải lý/h
+                : 0;
+              postVesselLocation(myVesselIdRef.current, {
+                latitude: fakeLat,
+                longitude: fakeLng,
+                speed: speedKnots,
+                heading: currentPos.coords.heading || 0,
+              })
+                .then(() => console.log('📍 Đã gửi vị trí GPS lên server:', fakeLat.toFixed(4), fakeLng.toFixed(4)))
+                .catch((e) => console.log('⚠️ Gửi vị trí GPS lên server thất bại:', e.message));
+            }
+
             return offsetToUse;
           });
           setIsLocating(false);

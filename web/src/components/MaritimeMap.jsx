@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { 
-  Navigation, 
-  Anchor, 
-  Zap, 
+import React, { useState, useEffect } from 'react';
+import {
+  Navigation,
+  Anchor,
+  Zap,
   Phone
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { fetchVesselsLocations } from '../api/vessels';
+import { MAP_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_TILE_SUBDOMAINS, MAP_TILE_MAX_ZOOM } from '../config/mapTiles';
 
 const fishingIcon = new L.DivIcon({
   html: `<div style="background-color: #0ea5e9; border: 2px solid #ffffff; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
@@ -27,12 +29,82 @@ const collectorIcon = new L.DivIcon({
   iconAnchor: [14, 14],
 });
 
+// Chuyển 1 bản ghi từ GET /api/vessels/locations (schema thật) sang đúng hình
+// dạng mà UI bên dưới đang dùng (vốn được viết theo mockData.js trước đây).
+// API thật chưa có captain/phone/homePort/batteryPercent -> để null, các chỗ
+// hiển thị bên dưới đã có fallback "Chưa cập nhật"/"N/A" nên không bị vỡ giao diện.
+const mapApiVessel = (v) => ({
+  id: v.vessel_id,
+  code: v.vessel_id ? String(v.vessel_id).slice(0, 8).toUpperCase() : 'N/A',
+  name: v.vessel_name,
+  type: v.vessel_type === 'COLLECTION' ? 'collector' : 'fishing',
+  lat: parseFloat(v.latitude),
+  lng: parseFloat(v.longitude),
+  speedKnots: v.speed ? parseFloat(v.speed) : 0,
+  heading: v.heading,
+  lastSeen: v.recorded_at,
+  captain: null,
+  phone: null,
+  homePort: null,
+  batteryPercent: null,
+});
+
 export default function MaritimeMap({ vessels, posts, orders }) {
-  const [selectedVessel, setSelectedVessel] = useState(vessels[0] || null);
-  const [targetVesselForRoute, setTargetVesselForRoute] = useState(vessels.length > 1 ? vessels[1] : (vessels[0] || null));
+  // Bắt đầu bằng dữ liệu mẫu (prop `vessels`) để bản đồ không trống trong lúc
+  // chờ gọi API lần đầu, rồi thay bằng vị trí GPS thật ngay khi có.
+  const [liveVessels, setLiveVessels] = useState(vessels);
+  const [isLive, setIsLive] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+
+  // Gọi GET /api/vessels/locations mỗi 10s — đồng bộ đúng nhịp poll mà Mobile
+  // App đang dùng (xem mobile/src/screens/HomeScreen.js: fetchVesselsLocations).
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadLocations = async () => {
+      try {
+        const data = await fetchVesselsLocations();
+        const mapped = data
+          .filter((v) => v.latitude != null && v.longitude != null)
+          .map(mapApiVessel);
+        if (cancelled) return;
+        if (mapped.length > 0) {
+          setLiveVessels(mapped);
+          setIsLive(true);
+          setLoadError(null);
+        } else {
+          // Chưa có tàu nào gửi GPS thật -> tiếp tục hiện dữ liệu mẫu để demo
+          setIsLive(false);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setIsLive(false);
+        setLoadError(err.message || 'Không tải được vị trí tàu từ server');
+      }
+    };
+
+    loadLocations();
+    const interval = setInterval(loadLocations, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const [selectedVessel, setSelectedVessel] = useState(liveVessels[0] || null);
+  const [targetVesselForRoute, setTargetVesselForRoute] = useState(liveVessels.length > 1 ? liveVessels[1] : (liveVessels[0] || null));
   const [filterType, setFilterType] = useState('ALL');
 
-  const filteredVessels = vessels.filter(v => {
+  // Khi dữ liệu chuyển từ mẫu sang GPS thật (hoặc ngược lại), chọn lại tàu đầu
+  // tiên của danh sách mới — tránh panel "Tàu Đang Chọn" treo vào tàu cũ đã
+  // không còn trong danh sách (mock dùng id số, API thật dùng UUID).
+  useEffect(() => {
+    setSelectedVessel(liveVessels[0] || null);
+    setTargetVesselForRoute(liveVessels.length > 1 ? liveVessels[1] : (liveVessels[0] || null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLive]);
+
+  const filteredVessels = liveVessels.filter(v => {
     if (filterType === 'FISHING') return v.type === 'fishing';
     if (filterType === 'COLLECTOR') return v.type === 'collector';
     return true;
@@ -65,7 +137,7 @@ export default function MaritimeMap({ vessels, posts, orders }) {
     ? `~${Math.max(1, Math.round((parseFloat(currentDistanceNM) / closingSpeedKnots) * 60))} Phút`
     : 'Không xác định';
 
-  const otherVessels = selectedVessel ? vessels.filter(v => v.id !== selectedVessel.id) : vessels;
+  const otherVessels = selectedVessel ? liveVessels.filter(v => v.id !== selectedVessel.id) : liveVessels;
 
   return (
     <div className="page-section">
@@ -86,6 +158,13 @@ export default function MaritimeMap({ vessels, posts, orders }) {
               <span className="text-slate-700 font-semibold">Vùng biển Vũng Tàu - Cát Lở - Nam Bộ</span>
               <span className="text-slate-300 hidden sm:inline">•</span>
               <span className="text-sky-600 hidden sm:inline">10.15°N - 10.40°N | 107.00°E - 107.25°E</span>
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border font-sans ${
+                isLive
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}>
+                {isLive ? '📡 GPS thực từ Mobile App' : '🧪 Dữ liệu mẫu (chưa có tàu gửi GPS)'}
+              </span>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
@@ -93,7 +172,7 @@ export default function MaritimeMap({ vessels, posts, orders }) {
                 onClick={() => setFilterType('ALL')}
                 className={`btn btn-sm ${filterType === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
               >
-                Tất cả ({vessels.length})
+                Tất cả ({liveVessels.length})
               </button>
               <button
                 onClick={() => setFilterType('FISHING')}
@@ -110,6 +189,10 @@ export default function MaritimeMap({ vessels, posts, orders }) {
             </div>
           </div>
 
+          {loadError && (
+            <p className="text-xs text-rose-600 -mt-2">⚠️ {loadError} — đang hiện dữ liệu mẫu tạm thời.</p>
+          )}
+
           {/* Interactive Sea Canvas Map Simulation */}
           <div className="relative rounded-2xl overflow-hidden border border-slate-200 h-[480px] shadow-inner">
             <MapContainer
@@ -117,9 +200,13 @@ export default function MaritimeMap({ vessels, posts, orders }) {
               zoom={9}
               style={{ width: '100%', height: '100%' }}
             >
+              {/* Nguồn tile lấy từ config/mapTiles.js — đổi nguồn bản đồ (VD: khi có
+                  API key CartoDB) chỉ cần sửa file đó, không cần sửa ở đây. */}
               <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution={MAP_TILE_ATTRIBUTION}
+                url={MAP_TILE_URL}
+                maxZoom={MAP_TILE_MAX_ZOOM}
+                {...(MAP_TILE_SUBDOMAINS ? { subdomains: MAP_TILE_SUBDOMAINS } : {})}
               />
 
               {filteredVessels.map((vessel) => (
@@ -132,7 +219,7 @@ export default function MaritimeMap({ vessels, posts, orders }) {
                       setSelectedVessel(vessel);
                       // Tránh trường hợp tàu đang chọn trùng với tàu đích tuyến đường
                       if (targetVesselForRoute && vessel.id === targetVesselForRoute.id) {
-                        const alt = vessels.find(v => v.id !== vessel.id);
+                        const alt = liveVessels.find(v => v.id !== vessel.id);
                         if (alt) setTargetVesselForRoute(alt);
                       }
                     },
@@ -173,7 +260,7 @@ export default function MaritimeMap({ vessels, posts, orders }) {
                   {targetVesselForRoute ? (
                     <select
                       value={targetVesselForRoute.id}
-                      onChange={(e) => setTargetVesselForRoute(vessels.find(v => v.id === e.target.value) || targetVesselForRoute)}
+                      onChange={(e) => setTargetVesselForRoute(liveVessels.find(v => v.id === e.target.value) || targetVesselForRoute)}
                       className="input-field text-xs font-bold py-1 px-2"
                     >
                       {otherVessels.map(v => (
@@ -250,7 +337,9 @@ export default function MaritimeMap({ vessels, posts, orders }) {
           </div>
 
           <div className="info-box info-box-sky">
-            📡 Tín hiệu định vị GPS được đồng bộ qua hệ thống vệ tinh hàng hải AIS mỗi 10 giây.
+            📡 Vị trí được đồng bộ mỗi 10 giây, lấy từ GPS thật do Mobile App gửi lên
+            khi tàu đang mở app và bật định vị (xem nút "Bật Định Vị Vùng Biển" trên
+            điện thoại). Tàu chưa từng gửi vị trí sẽ không xuất hiện ở đây.
           </div>
         </div>
 

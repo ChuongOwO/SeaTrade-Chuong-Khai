@@ -233,6 +233,28 @@ const calculateBearing = (lat1, lon1, lat2, lon2) => {
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 };
 
+/**
+ * Ghi nhận 1 vị trí GPS mới cho tàu — dùng khi Mobile App gửi định kỳ vị trí
+ * thật (xem mobile/src/screens/HomeScreen.js). Chỉ chủ tàu (owner) mới được
+ * ghi vị trí cho tàu của chính mình.
+ * Trả về null nếu không tìm thấy tàu hoặc không phải chủ tàu.
+ */
+const addVesselLocation = async (vessel_id, owner_id, { latitude, longitude, speed, heading }) => {
+  const vessel = await getVesselByIdAndOwner(vessel_id, owner_id);
+  if (!vessel) return null;
+
+  const query = `
+    INSERT INTO vessel_locations (vessel_id, location, speed, heading, recorded_at)
+    VALUES ($1, ST_GeographyFromText('POINT(' || $2 || ' ' || $3 || ')'), $4, $5, NOW())
+    RETURNING
+      id, vessel_id, speed, heading, recorded_at,
+      ST_X(location::geometry) AS longitude,
+      ST_Y(location::geometry) AS latitude
+  `;
+  const result = await pool.query(query, [vessel_id, longitude, latitude, speed || 0, heading || 0]);
+  return result.rows[0];
+};
+
 /** Chuyển bearing sang chữ tiếng Việt */
 const bearingToText = (bearing) => {
   if (bearing < 22.5 || bearing >= 337.5) return 'Bắc';
@@ -255,4 +277,5 @@ module.exports = {
   getAllVesselsWithLocation,
   getCurrentUserVessel,
   getNavigationInfo,
+  addVesselLocation,
 };
