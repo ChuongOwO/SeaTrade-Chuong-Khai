@@ -10,6 +10,11 @@ import { fetchMessages, sendMessage } from '../api/chatApi';
 
 const POLL_INTERVAL_MS = 5000;
 
+function formatMessageTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
 // Khung 1 cuộc trò chuyện — back-end chưa có WebSocket cho chat (chỉ có
 // socket.io-client dùng cho radar GPS, xem App.js) nên dùng REST polling mỗi
 // 5s để tạo cảm giác gần-realtime. Khi có server chat realtime thật, chỉ cần
@@ -75,7 +80,7 @@ export default function ChatThread({ conversation, onBack }) {
       keyboardVerticalOffset={90}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+        <TouchableOpacity onPress={onBack} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Quay lại danh sách hội thoại">
           <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{peerName}</Text>
@@ -110,6 +115,23 @@ export default function ChatThread({ conversation, onBack }) {
               <View style={[styles.bubbleRow, isMine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
                 <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
                   <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{item.message}</Text>
+                  <View style={styles.bubbleMetaRow}>
+                    <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
+                      {formatMessageTime(item.created_at)}
+                    </Text>
+                    {/* Trạng thái đã xem chỉ có ý nghĩa với tin nhắn CỦA MÌNH gửi đi
+                        — is_read lấy thẳng từ cột thật trong bảng messages (được
+                        chat.service.js markMessagesRead() cập nhật khi đối phương
+                        mở hội thoại này ra xem). */}
+                    {isMine && (
+                      <Ionicons
+                        name={item.is_read ? 'checkmark-done' : 'checkmark'}
+                        size={13}
+                        color="rgba(255,255,255,0.85)"
+                        style={styles.bubbleTicks}
+                      />
+                    )}
+                  </View>
                 </View>
               </View>
             );
@@ -129,6 +151,9 @@ export default function ChatThread({ conversation, onBack }) {
           style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
           onPress={handleSend}
           disabled={!input.trim() || sending}
+          accessibilityRole="button"
+          accessibilityLabel="Gửi tin nhắn"
+          accessibilityState={{ disabled: !input.trim() || sending }}
         >
           <Ionicons name="send" size={18} color="#fff" />
         </TouchableOpacity>
@@ -161,6 +186,10 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 14, color: colors.textPrimary },
   bubbleTextMine: { color: colors.textOnPrimary },
+  bubbleMetaRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 3, gap: 3 },
+  bubbleTime: { fontSize: 10, color: colors.textFaint },
+  bubbleTimeMine: { color: 'rgba(255,255,255,0.85)' },
+  bubbleTicks: { marginLeft: 1 },
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', padding: 10, gap: 8,
     backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border,
