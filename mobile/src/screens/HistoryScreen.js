@@ -118,22 +118,49 @@ export default function HistoryScreen() {
     );
   };
 
-  const renderConversationItem = ({ item }) => (
-    <TouchableOpacity style={styles.chatCard} onPress={() => setActiveConversation(item)}>
-      <View style={styles.chatAvatar}>
-        <Ionicons name="person" size={22} color={colors.primary} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.chatPeerName} numberOfLines={1}>
-          {item.peer?.full_name || item.peer?.phone || 'Người dùng'}
-        </Text>
-        <Text style={styles.chatLastMessage} numberOfLines={1}>
-          {item.last_message || 'Chưa có tin nhắn'}
-        </Text>
-      </View>
-      <Text style={styles.chatTime}>{formatTime(item.updated_at)}</Text>
-    </TouchableOpacity>
-  );
+  const renderConversationItem = ({ item }) => {
+    // unread_count do back-end tính riêng cho từng hội thoại (chat.service.js
+    // listConversationsForUser) — khác với unreadCount toàn cục ở tab Chat,
+    // cái này cho biết CHÍNH XÁC cuộc trò chuyện nào có tin chưa đọc.
+    const unread = item.unread_count || 0;
+    const isUnread = unread > 0;
+    const peerName = item.peer?.full_name || item.peer?.phone || 'Người dùng';
+    return (
+      <TouchableOpacity
+        style={styles.chatCard}
+        onPress={() => setActiveConversation(item)}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isUnread
+            ? `Hội thoại với ${peerName}, ${unread} tin nhắn chưa đọc`
+            : `Hội thoại với ${peerName}`
+        }
+      >
+        <View style={styles.chatAvatarWrap}>
+          <View style={styles.chatAvatar}>
+            <Ionicons name="person" size={22} color={colors.primary} />
+          </View>
+          {isUnread && <View style={styles.chatAvatarDot} />}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.chatPeerName, isUnread && styles.chatPeerNameUnread]} numberOfLines={1}>
+            {peerName}
+          </Text>
+          <Text style={[styles.chatLastMessage, isUnread && styles.chatLastMessageUnread]} numberOfLines={1}>
+            {item.last_message || 'Chưa có tin nhắn'}
+          </Text>
+        </View>
+        <View style={styles.chatCardRight}>
+          <Text style={[styles.chatTime, isUnread && styles.chatTimeUnread]}>{formatTime(item.updated_at)}</Text>
+          {isUnread && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{unread > 9 ? '9+' : unread}</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (activeConversation) {
     return (
@@ -147,6 +174,10 @@ export default function HistoryScreen() {
             // ngay ở đây để chấm đỏ trên sub-tab "Chat" cập nhật liền, không
             // phải đợi tới lần poll định kỳ tiếp theo (tối đa 5s).
             refreshNotifications();
+            // Refresh luôn danh sách hội thoại (silent, không hiện spinner) để
+            // unread_count/badge của hội thoại vừa đọc biến mất ngay lập tức
+            // thay vì đợi vòng poll 8s tiếp theo.
+            loadConversations({ silent: true });
           }}
         />
       </SafeAreaView>
@@ -473,6 +504,9 @@ const styles = StyleSheet.create({
     borderColor: '#f1f5f9',
     gap: 10,
   },
+  chatAvatarWrap: {
+    position: 'relative',
+  },
   chatAvatar: {
     width: 42,
     height: 42,
@@ -481,9 +515,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Chấm đỏ nhỏ trên avatar — đánh dấu NGAY tại hội thoại nào có tin chưa đọc,
+  // để không phải đoán/đếm bằng chấm đỏ chung ở tab Chat nữa.
+  chatAvatarDot: {
+    position: 'absolute',
+    top: -1,
+    right: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.danger,
+    borderWidth: 2,
+    borderColor: colors.card,
+  },
   chatPeerName: {
     fontSize: 14,
     fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  chatPeerNameUnread: {
     color: colors.textPrimary,
   },
   chatLastMessage: {
@@ -491,9 +541,37 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
   },
+  // Tin nhắn cuối được in đậm + màu chữ đậm hơn khi hội thoại còn tin chưa đọc,
+  // giống quy ước của các app chat phổ biến.
+  chatLastMessageUnread: {
+    color: colors.textPrimary,
+    fontWeight: '700',
+  },
+  chatCardRight: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
   chatTime: {
     fontSize: 10,
     color: colors.textFaint,
+  },
+  chatTimeUnread: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  unreadBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    backgroundColor: colors.danger,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  unreadBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   modalOverlay: {
     flex: 1,
