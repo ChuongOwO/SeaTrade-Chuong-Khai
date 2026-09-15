@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SEA_CENTER = { latitude: 10.3240, longitude: 107.1240 };
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const { colors, isDarkMode } = useTheme();
   const mapRef = useRef(null);
 
@@ -64,8 +64,37 @@ export default function HomeScreen() {
     }
   };
 
+  const checkFishermanVessel = async () => {
+    try {
+      const userDataStr = await AsyncStorage.getItem('userData');
+      if (!userDataStr) return;
+      const userData = JSON.parse(userDataStr);
+
+      if (userData.role === 'FISHERMAN') {
+        const token = await AsyncStorage.getItem('userToken');
+        const res = await fetch(`${API_URL}/api/vessels/my-vessel`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (res.status === 404) {
+          Alert.alert(
+            'Chưa đăng ký tàu',
+            'Bạn chưa đăng ký tàu. Đăng ký tàu để hiển thị trên bản đồ và sử dụng đầy đủ chức năng.',
+            [
+              { text: 'Bỏ qua', style: 'cancel' },
+              { text: 'Đăng ký tàu', onPress: () => navigation.navigate('CreateVessel') }
+            ]
+          );
+        }
+      }
+    } catch (e) {
+      console.log('Lỗi check vessel:', e);
+    }
+  };
+
   useEffect(() => {
     fetchVesselsLocations();
+    checkFishermanVessel();
     // Refresh mỗi 10s
     const interval = setInterval(fetchVesselsLocations, 10000);
     return () => clearInterval(interval);
@@ -173,7 +202,20 @@ export default function HomeScreen() {
           setSelectedVessel(found);
           setIsNavigating(false);
         }
-        Alert.alert('Lỗi Dẫn đường', data.message);
+        
+        // Nếu lỗi là chưa đăng ký tàu, prompt user
+        if (data.status === 404 && data.message.includes('chưa đăng ký tàu')) {
+          Alert.alert(
+            'Chưa đăng ký tàu',
+            'Bạn cần đăng ký tàu trước khi sử dụng chức năng này.',
+            [
+              { text: 'Đăng ký tàu', onPress: () => navigation.navigate('CreateVessel') },
+              { text: 'Hủy', style: 'cancel' }
+            ]
+          );
+        } else {
+          Alert.alert('Lỗi Dẫn đường', data.message);
+        }
       }
     } catch (e) {
       console.log('Navigation Error:', e);

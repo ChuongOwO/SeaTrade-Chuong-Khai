@@ -18,6 +18,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import CreateVesselScreen from '../screens/CreateVesselScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -173,7 +174,10 @@ export default function AppNavigator() {
         </>
       ) : (
         // --- MAIN STACK ---
-        <Stack.Screen name="MainTabs" component={MainTabs} />
+        <>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen name="CreateVessel" component={CreateVesselScreen} />
+        </>
       )}
     </Stack.Navigator>
   );
