@@ -1,73 +1,101 @@
 @import "tailwindcss";
 
-/* Design System - SeaTrade AI - shadcn/ui-inspired Light Theme (v3)
-   Quy ước biến theo đúng chuẩn shadcn/ui (background/foreground/card/primary/
-   muted/accent/destructive/border/input/ring) để có visual language nhất
-   quán, bắt mắt hơn — nhưng viết tay bằng Tailwind thuần, KHÔNG cài thêm
-   package nào (không Radix, không class-variance-authority). */
+/* ============================================================
+   THEME REMAP (Tailwind v4 @theme) — "Fresh Catch Market"
+   ------------------------------------------------------------
+   Đổi thẳng các thang màu Tailwind có sẵn (sky, slate) mà JSX
+   khắp dự án đang dùng trực tiếp (bg-sky-500, text-slate-500...),
+   để đổi giao diện toàn site KHÔNG cần sửa từng file component.
+   Thêm 1 thang màu mới "coral" (cam san hô) làm điểm nhấn năng
+   lượng "chợ hải sản tươi sống" cho các nút hành động chính.
+   Giá trị hex copy từ chính bảng màu gốc của Tailwind (teal/
+   stone/orange) để đảm bảo các bước màu vẫn cân đối, không tự
+   chế số hex tuỳ tiện.
+   ============================================================ */
+@theme {
+  /* sky -> teal (xanh đại dương sống động, thay cho xanh sky lạnh cũ) */
+  --color-sky-50: #f0fdfa;
+  --color-sky-100: #ccfbf1;
+  --color-sky-200: #99f6e4;
+  --color-sky-300: #5eead4;
+  --color-sky-400: #2dd4bf;
+  --color-sky-500: #14b8a6;
+  --color-sky-600: #0d9488;
+  --color-sky-700: #0f766e;
+  --color-sky-800: #115e59;
+  --color-sky-900: #134e4a;
+  --color-sky-950: #042f2e;
+
+  /* slate -> stone (xám ấm, hợp với nền kem thay vì xám xanh lạnh cũ) */
+  --color-slate-50: #fafaf9;
+  --color-slate-100: #f5f5f4;
+  --color-slate-200: #e7e5e4;
+  --color-slate-300: #d6d3d1;
+  --color-slate-400: #a8a29e;
+  --color-slate-500: #78716c;
+  --color-slate-600: #57534e;
+  --color-slate-700: #44403c;
+  --color-slate-800: #292524;
+  --color-slate-900: #1c1917;
+  --color-slate-950: #0c0a09;
+
+  /* coral (mới) — điểm nhấn cam san hô cho nút hành động chính */
+  --color-coral-50: #fff7ed;
+  --color-coral-100: #ffedd5;
+  --color-coral-200: #fed7aa;
+  --color-coral-300: #fdba74;
+  --color-coral-400: #fb923c;
+  --color-coral-500: #f97316;
+  --color-coral-600: #ea580c;
+  --color-coral-700: #c2410c;
+  --color-coral-800: #9a3412;
+  --color-coral-900: #7c2d12;
+  --color-coral-950: #431407;
+}
+
+/* Design System - SeaTrade AI - "Fresh Catch Market" Theme (v3) */
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --bg-main: #fdfaf5;
+  --bg-card: #ffffff;
+  --bg-card-hover: #ffffff;
+  --border-color: #e9e1d3;
+  --border-color-strong: #d8cbb0;
 
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-
-  --primary: #0284c7;
-  --primary-deep: #075985;
-  --primary-foreground: #ffffff;
-
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-
-  --accent: #f0f9ff;
-  --accent-foreground: #075985;
-
+  /* 1 màu thương hiệu (teal đại dương) + 1 màu điểm nhấn hành động (cam san
+     hô "cá tươi") + 3 màu ngữ nghĩa trạng thái. */
+  --primary: #0d9488;
+  --primary-deep: #115e59;
+  --accent: #ea580c;
+  --accent-deep: #9a3412;
   --success: #059669;
   --warning: #b45309;
   --danger: #be123c;
-  --destructive: #e11d48;
-  --destructive-foreground: #ffffff;
 
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --input: #e2e8f0;
-  --ring: #0284c7;
+  --text-main: #1c1917;
+  --text-muted: #78716c;
+  --text-sub: #57534e;
 
-  /* Alias cũ (giữ lại để không phải sửa toàn bộ JSX) */
-  --bg-main: var(--background);
-  --bg-card: var(--card);
-  --bg-card-hover: var(--card);
-  --border-color: var(--border);
-  --border-color-strong: var(--border-strong);
-  --text-main: var(--foreground);
-  --text-muted: var(--muted-foreground);
-  --text-sub: #475569;
+  /* Be Vietnam Pro: font chữ chính, đảm bảo hiển thị đúng dấu tiếng Việt.
+     Baloo 2: font chữ hiển thị (logo, số liệu thống kê) — chỉ dùng cho chữ
+     La-tinh/số, KHÔNG dùng cho nhãn tiếng Việt để tránh rủi ro mất dấu như
+     từng gặp với nền bản đồ (xem config/mapTiles.js). */
+  --font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Baloo 2', 'Be Vietnam Pro', sans-serif;
 
-  --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-
-  /* Thang bo góc theo đúng công thức shadcn/ui: --radius là gốc, các mức
-     còn lại suy ra bằng calc() thay vì khai báo cố định từng mức. */
-  --radius: 0.7rem;
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 6px);
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
   --radius-full: 9999px;
 
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.05);
-  --shadow-card-hover: 0 8px 24px rgba(15, 23, 42, 0.09), 0 2px 6px rgba(15, 23, 42, 0.05);
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-card: 0 1px 2px rgba(28, 25, 23, 0.05), 0 1px 6px rgba(28, 25, 23, 0.05);
+  --shadow-card-hover: 0 4px 16px rgba(28, 25, 23, 0.1);
 
   /* Khoảng cách dọc chuẩn toàn site */
   --space-v: 22px;
 
   /* Chiều rộng sidebar điều hướng */
-  --sidebar-w: 252px;
+  --sidebar-w: 248px;
   --sidebar-w-collapsed: 76px;
 }
 
@@ -100,6 +128,10 @@ body {
   min-height: 100%;
 }
 
+.font-display {
+  font-family: var(--font-display);
+}
+
 .app-shell::before,
 .app-shell::after {
   content: '';
@@ -118,11 +150,65 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.45);
+  background: rgba(120, 113, 108, 0.4);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.7);
+  background: rgba(87, 83, 78, 0.65);
+}
+
+/* ============================================================
+   ACCESSIBILITY (WCAG 2.2 AA) — áp dụng toàn site
+   ============================================================ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  z-index: 100;
+  background: var(--primary-deep);
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ============================================================
@@ -160,11 +246,11 @@ body {
 }
 
 .sidebar-nav-item {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 0.7rem;
   padding: 0.6rem 0.75rem;
+  min-height: 40px;
   border-radius: var(--radius-md);
   font-size: 0.8125rem;
   font-weight: 600;
@@ -174,16 +260,13 @@ body {
 }
 
 .sidebar-nav-item:hover {
-  background: var(--muted);
+  background: #f7f2e9;
   color: var(--text-main);
 }
 
 .sidebar-nav-item.active {
-  background: var(--accent);
+  background: #f0fdfa;
   color: var(--primary-deep);
-  font-weight: 700;
-  padding-left: calc(0.75rem - 3px);
-  box-shadow: inset 3px 0 0 var(--primary);
 }
 
 .sidebar-nav-group-label {
@@ -191,7 +274,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #94a3b8;
+  color: #a8a29e;
   padding: 0.9rem 0.75rem 0.35rem;
 }
 
@@ -211,7 +294,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgba(247, 249, 251, 0.9);
+  background: rgba(253, 250, 245, 0.9);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-color);
@@ -268,115 +351,64 @@ body {
 }
 
 .btn-export-report:hover {
-  background: #f8fafc;
+  background: #faf6ef;
   border-color: var(--primary);
 }
 
 /* ============================================================
-   BUTTON SYSTEM — kiểu shadcn/ui (viết tay bằng CSS thuần,
-   không dùng class-variance-authority). Dùng .btn + 1 variant +
-   (tuỳ chọn) 1 size class.
+   BUTTON SYSTEM — trước đây .btn/.btn-primary/.btn-secondary/
+   .btn-success/.btn-sm/.btn-lg được dùng trong JSX (LoginScreen,
+   MaritimeMap...) nhưng CHƯA từng được định nghĩa ở đâu cả, nên
+   các nút đó hiển thị hoàn toàn không có style (nút HTML mặc định
+   của trình duyệt). Bổ sung ở đây, đồng thời là nơi thể hiện màu
+   nhấn "coral" cho nút hành động chính.
    ============================================================ */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  white-space: nowrap;
-  border: 1px solid transparent;
+  min-height: 40px;
+  padding: 0.55rem 1.1rem;
   border-radius: var(--radius-md);
-  padding: 0.6rem 1.1rem;
+  border: 1px solid transparent;
   font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 1;
+  font-weight: 700;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
 
 .btn:active {
   transform: translateY(1px);
 }
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px color-mix(in srgb, var(--ring) 55%, transparent);
-}
-
 .btn-primary {
-  background: var(--primary);
-  color: var(--primary-foreground);
-  box-shadow: 0 1px 2px rgba(2, 132, 199, 0.18);
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(234, 88, 12, 0.3);
 }
 
 .btn-primary:hover {
-  background: var(--primary-deep);
+  background: var(--accent-deep);
 }
 
 .btn-secondary {
-  background: var(--secondary);
-  color: var(--secondary-foreground);
-  border-color: var(--border);
+  background: var(--bg-card);
+  color: var(--text-sub);
+  border-color: var(--border-color-strong);
 }
 
 .btn-secondary:hover {
-  background: #e2e8f0;
-}
-
-.btn-outline {
-  background: var(--card);
-  color: var(--foreground);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-sm);
-}
-
-.btn-outline:hover {
-  background: var(--accent);
+  background: #faf6ef;
   border-color: var(--primary);
   color: var(--primary-deep);
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--text-sub);
-  border-color: transparent;
-}
-
-.btn-ghost:hover {
-  background: var(--muted);
-  color: var(--foreground);
-}
-
-.btn-destructive {
-  background: var(--destructive);
-  color: var(--destructive-foreground);
-  box-shadow: 0 1px 2px rgba(225, 29, 72, 0.18);
-}
-
-.btn-destructive:hover {
-  background: #be123c;
-}
-
-.btn-outline-destructive {
-  background: #fff1f2;
-  color: var(--danger);
-  border-color: #fecdd3;
-}
-
-.btn-outline-destructive:hover {
-  background: #ffe4e6;
-  border-color: #fda4af;
 }
 
 .btn-success {
   background: var(--success);
   color: #ffffff;
-  box-shadow: 0 1px 2px rgba(5, 150, 105, 0.18);
 }
 
 .btn-success:hover {
@@ -384,20 +416,15 @@ body {
 }
 
 .btn-sm {
+  min-height: 32px;
   padding: 0.4rem 0.8rem;
   font-size: 0.75rem;
-  border-radius: var(--radius-sm);
 }
 
 .btn-lg {
-  padding: 0.75rem 1.5rem;
-  font-size: 0.875rem;
-}
-
-.btn-icon {
-  padding: 0.55rem;
-  width: 2.25rem;
-  height: 2.25rem;
+  min-height: 48px;
+  padding: 0.8rem 1.3rem;
+  font-size: 0.9375rem;
 }
 
 /* Layout utilities */
@@ -451,11 +478,10 @@ body {
   margin-bottom: 0.2rem;
 }
 
-/* Card kiểu shadcn/ui: bg-card + border + shadow-sm, không blur/glow chồng lớp */
+/* Card phẳng, không blur/glow chồng lớp — đỡ rối khi nhiều card xếp cạnh nhau */
 .glass-panel {
-  background: var(--card);
-  color: var(--card-foreground);
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   padding: 1.375rem;
@@ -463,35 +489,32 @@ body {
 }
 
 .glass-panel:hover {
-  border-color: var(--border-strong);
+  border-color: var(--border-color-strong);
 }
 
 .glass-card {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: #fbf8f2;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 0.9rem 1rem;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .glass-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-sm);
+  border-color: var(--border-color-strong);
 }
 
 .stat-card {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 1.25rem 1.375rem;
   box-shadow: var(--shadow-card);
-  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  transition: box-shadow 0.2s ease;
 }
 
 .stat-card:hover {
   box-shadow: var(--shadow-card-hover);
-  border-color: var(--border-strong);
-  transform: translateY(-2px);
 }
 
 .stat-label {
@@ -503,8 +526,9 @@ body {
 }
 
 .stat-value {
+  font-family: var(--font-display);
   font-size: 1.75rem;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-main);
   font-variant-numeric: tabular-nums;
   margin-top: 0.4rem;
@@ -518,8 +542,8 @@ body {
 }
 
 .info-box-sky {
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
   color: var(--primary-deep);
 }
 
@@ -529,17 +553,10 @@ body {
   color: #065f46;
 }
 
-/* Data table — bọc trong khung bo góc kiểu shadcn Table */
-.table-wrap {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--card);
-}
-
+/* Data table */
 .data-table thead tr {
-  background: var(--muted);
-  border-bottom: 1px solid var(--border-strong);
+  background: #f7f2e9;
+  border-bottom: 1px solid var(--border-color-strong);
 }
 
 .data-table th {
@@ -562,19 +579,15 @@ body {
   transition: background-color 0.15s ease;
 }
 
-.data-table tbody tr:last-child {
-  border-bottom: none;
-}
-
 .data-table tbody tr:hover {
-  background: var(--muted);
+  background: #faf6ef;
 }
 
-/* Form inputs — kiểu shadcn Input */
+/* Form inputs */
 .input-field {
   padding: 0.55rem 0.8rem;
-  background: var(--card);
-  border: 1px solid var(--input);
+  background: white;
+  border: 1px solid var(--border-color-strong);
   border-radius: var(--radius-md);
   font-size: 0.8125rem;
   color: var(--text-main);
@@ -584,11 +597,11 @@ body {
 .input-field:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.14);
 }
 
 .input-field::placeholder {
-  color: #94a3b8;
+  color: #a8a29e;
 }
 
 .input-field.input-search {
@@ -675,9 +688,9 @@ body {
 }
 
 .badge-sm.badge-cyan {
-  background: #eff6ff;
+  background: #f0fdfa;
   color: var(--primary-deep);
-  border: 1px solid #bfdbfe;
+  border: 1px solid #99f6e4;
 }
 
 .badge-sm.badge-emerald {
@@ -693,9 +706,9 @@ body {
 }
 
 .badge-cyan {
-  background: #eff6ff;
+  background: #f0fdfa;
   color: var(--primary-deep);
-  border: 1px solid #bfdbfe;
+  border: 1px solid #99f6e4;
 }
 
 .badge-emerald {
@@ -720,7 +733,7 @@ body {
 .progress-track {
   width: 100%;
   height: 8px;
-  background: #eef2f6;
+  background: #f0ebe0;
   border-radius: var(--radius-full);
   overflow: hidden;
 }
