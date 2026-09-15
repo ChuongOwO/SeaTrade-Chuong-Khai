@@ -48,6 +48,9 @@ const checkParticipant = async (conversationId, userId) => {
 // Danh sách hội thoại của 1 user, kèm thông tin người còn lại + tin nhắn gần nhất,
 // sắp xếp theo hoạt động mới nhất trước (updated_at được tự cập nhật bởi trigger
 // trg_conversations_updated_at mỗi khi có tin nhắn mới — xem createMessage()).
+// unread_count: số tin nhắn của hội thoại này mà $1 CHƯA đọc (sender khác mình,
+// is_read = FALSE) — để mobile biết chính xác hội thoại nào có tin mới, khác
+// với chấm đỏ toàn cục ở tab Chat (chỉ báo "có tin mới ở đâu đó").
 const listConversationsForUser = async (userId) => {
   const query = `
     SELECT
@@ -58,7 +61,8 @@ const listConversationsForUser = async (userId) => {
         'phone', peer.phone, 'avatar_url', peer.avatar_url
       ) AS peer,
       lm.message AS last_message,
-      lm.sender_id AS last_message_sender_id
+      lm.sender_id AS last_message_sender_id,
+      COALESCE(unread.cnt, 0)::int AS unread_count
     FROM conversations c
     JOIN users peer ON peer.id = CASE WHEN c.buyer_id = $1 THEN c.seller_id ELSE c.buyer_id END
     LEFT JOIN LATERAL (
@@ -67,6 +71,10 @@ const listConversationsForUser = async (userId) => {
       ORDER BY created_at DESC
       LIMIT 1
     ) lm ON true
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) AS cnt FROM messages
+      WHERE conversation_id = c.id AND sender_id <> $1 AND is_read = FALSE
+    ) unread ON true
     WHERE c.buyer_id = $1 OR c.seller_id = $1
     ORDER BY c.updated_at DESC
   `;
