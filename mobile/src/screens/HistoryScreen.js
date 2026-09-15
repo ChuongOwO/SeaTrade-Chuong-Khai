@@ -43,26 +43,37 @@ export default function HistoryScreen() {
   const [peerPhoneInput, setPeerPhoneInput] = useState('');
   const [startingChat, setStartingChat] = useState(false);
 
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async ({ silent } = {}) => {
     try {
-      setLoadingConversations(true);
+      if (!silent) setLoadingConversations(true);
       const data = await fetchConversations();
       setConversations(data);
       setConversationsError('');
     } catch (err) {
-      setConversationsError(
-        err.status === 404
-          ? 'API chat chưa tồn tại trên back-end (404). Cần đồng đội xác nhận đã tạo module chat chưa.'
-          : (err.message || 'Không kết nối được tới máy chủ chat.')
-      );
+      // Lỗi ở lần poll nền (silent) không nên đè banner lỗi người dùng đang
+      // đọc dở — chỉ cập nhật lỗi khi đây là lần tải "chính" (mở tab/kéo refresh).
+      if (!silent) {
+        setConversationsError(
+          err.status === 404
+            ? 'API chat chưa tồn tại trên back-end (404). Cần đồng đội xác nhận đã tạo module chat chưa.'
+            : (err.message || 'Không kết nối được tới máy chủ chat.')
+        );
+      }
     } finally {
-      setLoadingConversations(false);
+      if (!silent) setLoadingConversations(false);
     }
   }, []);
 
+  // Tự làm mới danh sách hội thoại mỗi 8s khi đang đứng ở tab Chat (chưa mở
+  // hẳn 1 hội thoại) — cùng kiểu REST polling đang dùng ở ChatThread.js và
+  // NotificationContext.js. Nhờ vậy tin nhắn mới/preview cập nhật mà không
+  // cần thoát ra vào lại tab. {silent: true} để không nháy spinner mỗi lần
+  // poll nền (chỉ hiện spinner ở lần tải đầu hoặc khi người dùng chủ động kéo refresh).
   useEffect(() => {
     if (tab === 'CHAT' && !activeConversation) {
       loadConversations();
+      const interval = setInterval(() => loadConversations({ silent: true }), 8000);
+      return () => clearInterval(interval);
     }
   }, [tab, activeConversation, loadConversations]);
 
@@ -146,11 +157,24 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Lịch Sử</Text>
-        {tab === 'CHAT' && (
-          <TouchableOpacity style={styles.newChatBtn} onPress={() => setNewChatModalVisible(true)}>
-            <Ionicons name="add-circle" size={26} color={colors.primary} />
-          </TouchableOpacity>
-        )}
+        {/* QUAN TRỌNG: nút này LUÔN được render (kể cả ở tab Giao dịch), chỉ ẩn
+            bằng opacity:0 + disabled thay vì ẩn hẳn bằng điều kiện && như
+            trước. Lý do: ẩn hẳn bằng && làm header đổi chiều cao mỗi lần đổi
+            tab (có nút ở tab Chat cao hơn không có nút ở tab Giao dịch), khiến
+            cả thanh tab bar bên dưới bị nhảy/lệch vị trí theo mỗi lần chuyển
+            tab — đây chính là lỗi "lệch nhau khi chuyển tab" đã gặp. Giữ
+            nguyên chỗ đứng của nút thì chiều cao header luôn cố định. */}
+        <TouchableOpacity
+          style={[styles.newChatBtn, tab !== 'CHAT' && styles.newChatBtnHidden]}
+          onPress={() => setNewChatModalVisible(true)}
+          disabled={tab !== 'CHAT'}
+          accessibilityElementsHidden={tab !== 'CHAT'}
+          importantForAccessibility={tab !== 'CHAT' ? 'no-hide-descendants' : 'yes'}
+          accessibilityRole="button"
+          accessibilityLabel="Nhắn tin mới"
+        >
+          <Ionicons name="add-circle" size={26} color={colors.primary} />
+        </TouchableOpacity>
       </View>
 
       {/* 2 tab con: Giao dịch / Chat */}
@@ -158,6 +182,9 @@ export default function HistoryScreen() {
         <TouchableOpacity
           style={[styles.tabBtn, tab === 'TRANSACTIONS' && styles.tabBtnActive]}
           onPress={() => setTab('TRANSACTIONS')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === 'TRANSACTIONS' }}
+          accessibilityLabel="Giao dịch"
         >
           <Ionicons name="receipt" size={16} color={tab === 'TRANSACTIONS' ? '#fff' : colors.textMuted} />
           <Text style={[styles.tabBtnText, tab === 'TRANSACTIONS' && styles.tabBtnTextActive]}>Giao dịch</Text>
@@ -165,6 +192,9 @@ export default function HistoryScreen() {
         <TouchableOpacity
           style={[styles.tabBtn, tab === 'CHAT' && styles.tabBtnActive]}
           onPress={() => setTab('CHAT')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === 'CHAT' }}
+          accessibilityLabel={unreadCount > 0 ? `Chat, ${unreadCount} tin nhắn chưa đọc` : 'Chat'}
         >
           <View>
             <Ionicons name="chatbubbles" size={16} color={tab === 'CHAT' ? '#fff' : colors.textMuted} />
@@ -199,7 +229,7 @@ export default function HistoryScreen() {
           <View style={styles.emptyContainer}>
             <Ionicons name="warning-outline" size={40} color={colors.danger} />
             <Text style={styles.errorText}>{conversationsError}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={loadConversations}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => loadConversations()} accessibilityRole="button" accessibilityLabel="Thử tải lại danh sách hội thoại">
               <Text style={styles.retryBtnText}>Thử lại</Text>
             </TouchableOpacity>
           </View>
@@ -207,7 +237,7 @@ export default function HistoryScreen() {
           <View style={styles.emptyContainer}>
             <Ionicons name="chatbubbles-outline" size={48} color={colors.textFaint} />
             <Text style={styles.emptyText}>Chưa có cuộc trò chuyện nào.</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => setNewChatModalVisible(true)}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => setNewChatModalVisible(true)} accessibilityRole="button" accessibilityLabel="Bắt đầu nhắn tin mới">
               <Text style={styles.retryBtnText}>+ Nhắn tin mới</Text>
             </TouchableOpacity>
           </View>
@@ -288,6 +318,8 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   newChatBtn: { padding: 2 },
+  // Ẩn "vô hình" (opacity 0) thay vì gỡ khỏi cây layout — xem giải thích ở JSX phía trên.
+  newChatBtnHidden: { opacity: 0 },
   tabBar: {
     flexDirection: 'row',
     margin: 16,

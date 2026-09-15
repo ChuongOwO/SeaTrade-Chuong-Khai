@@ -72,6 +72,9 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  // Nhắc Thuyền Trưởng đăng ký tàu nếu tài khoản FISHERMAN chưa có tàu nào
+  // trong hệ thống (tránh trường hợp đăng nhập xong không thấy mình trên bản
+  // đồ vì chưa có vessel_id nào gắn với tài khoản).
   const checkFishermanVessel = async () => {
     try {
       const userDataStr = await AsyncStorage.getItem('userData');
@@ -83,7 +86,7 @@ export default function HomeScreen({ navigation }) {
         const res = await fetch(`${API_URL}/api/vessels/my-vessel`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         if (res.status === 404) {
           Alert.alert(
             'Chưa đăng ký tàu',
@@ -244,7 +247,7 @@ export default function HomeScreen({ navigation }) {
           setSelectedVessel(found);
           setIsNavigating(false);
         }
-        
+
         // Nếu lỗi là chưa đăng ký tàu, prompt user
         if (data.status === 404 && data.message.includes('chưa đăng ký tàu')) {
           Alert.alert(
