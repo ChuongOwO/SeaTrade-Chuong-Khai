@@ -17,17 +17,37 @@ from app.core.config import CONFIDENCE_THRESHOLD, IMAGE_SIZE, MODEL_PATH
 # thử pipeline (upload ảnh → inference → trả kết quả) trong lúc chưa có model
 # đúng phạm vi.
 #
-# Cần train 1 model MỚI cho đúng 5 loài hải sản thật — xem hướng dẫn đầy đủ
+# Cần train 1 model MỚI cho đúng phạm vi hải sản thật — xem hướng dẫn đầy đủ
 # (thu thập ảnh, gán nhãn Roboflow, train bằng Colab) trong file
 # HUONG_DAN_TRAIN_MODEL_HAI_SAN.md + script train_seafood_model.py ở gốc dự án.
 # Sau khi có model mới, cập nhật dict SPECIES_INFO bên dưới cho khớp đúng tên
 # lớp (in ra bằng lệnh):
 #   python -c "from ultralytics import YOLO; print(YOLO('ml-models/seafood_model.pt').names)"
+#
+# CẬP NHẬT: mỗi loài được TÁCH thành các lớp con theo biến thể/loại thực tế
+# (giá thị trường chênh lệch nhiều giữa các biến thể, vd tôm hùm bông vs tôm
+# hùm xanh) — xem lại Bước 0 trong HUONG_DAN_TRAIN_MODEL_HAI_SAN.md.
+#
+# Giá base_price bên dưới là giá THAM KHẢO tra cứu trên mạng (đơn giá bán lẻ/
+# tươi sống phổ biến, đơn vị đ/kg, tra cứu 09/2026) — GIÁ HẢI SẢN BIẾN ĐỘNG
+# THEO NGÀY/MÙA VỤ/VÙNG MIỀN, nên coi đây là giá khởi điểm để demo, cần xác
+# minh lại với giá thị trường thực tế tại địa phương trước khi đưa vào báo cáo
+# chính thức. Cá ngừ bông đặc biệt chưa tìm được giá bán lẻ tin cậy (chỉ có
+# giá sỉ đông lạnh ~44-54k/kg) — ưu tiên xác minh lại giá này trước tiên.
 # ==============================================================================
 SPECIES_INFO = {
-    "ca_ngu": {"label_vi": "Cá Ngừ Vây Vàng", "base_price": 190000},
-    "ca_thu": {"label_vi": "Cá Thu Thuận Hải", "base_price": 220000},
-    "tom_hum": {"label_vi": "Tôm Hùm Bông", "base_price": 1280000},
+    # --- Tôm hùm (giá tôm hùm SỐNG, theo mùa) ---
+    "tom_hum_bong": {"label_vi": "Tôm Hùm Bông", "base_price": 1600000},
+    "tom_hum_xanh": {"label_vi": "Tôm Hùm Xanh", "base_price": 1000000},
+    # --- Cá thu (giá tươi sống, bán lẻ) ---
+    "ca_thu_ao": {"label_vi": "Cá Thu Áo", "base_price": 190000},
+    "ca_thu_cham": {"label_vi": "Cá Thu Chấm", "base_price": 190000},
+    "ca_thu_phan": {"label_vi": "Cá Thu Phấn", "base_price": 240000},
+    # --- Cá ngừ (giá tươi sống, bán lẻ — riêng cá ngừ bông cần xác minh lại) ---
+    "ca_ngu_bong": {"label_vi": "Cá Ngừ Bông", "base_price": 70000},
+    "ca_ngu_vay_xanh": {"label_vi": "Cá Ngừ Vây Xanh", "base_price": 1800000},
+    "ca_ngu_o": {"label_vi": "Cá Ngừ Ồ", "base_price": 45000},
+    # --- Chưa tách biến thể (chưa có đủ ảnh từng loại) ---
     "muc_la": {"label_vi": "Mực Lá Tươi", "base_price": 165000},
     "cua": {"label_vi": "Cua Cà Mau", "base_price": 350000},
     # Giữ tạm mapping của model tôm giống cũ để không lỗi nếu vẫn còn dùng
