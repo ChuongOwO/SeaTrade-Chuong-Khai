@@ -4,10 +4,13 @@ from pathlib import Path
 # ai-service/  (thư mục gốc của service, cha 2 cấp của file này)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Đường dẫn tới model YOLOv8 đã train riêng cho tôm giống. Có thể override
-# bằng biến môi trường AI_MODEL_PATH để thử model khác (VD: yolov8n.pt gốc,
-# hoặc ml-models/shrimp_model_old.pt) mà không cần sửa code.
-MODEL_PATH = os.getenv("AI_MODEL_PATH", str(BASE_DIR / "ml-models" / "shrimp_model.pt"))
+# Đường dẫn tới model YOLOv8 đã train cho ĐÚNG đề tài hải sản thật (8 lớp:
+# tôm hùm/cá thu/cá ngừ, xem HUONG_DAN_TRAIN_MODEL_HAI_SAN.md). Model tôm
+# giống cũ (shrimp_model.pt, đề tài đã hủy) đã chuyển vào
+# ml-models/_old_demo_model_khong_dung/ — không còn được dùng mặc định.
+# Có thể override bằng biến môi trường AI_MODEL_PATH để thử model khác
+# (VD: yolov8n.pt gốc) mà không cần sửa code.
+MODEL_PATH = os.getenv("AI_MODEL_PATH", str(BASE_DIR / "ml-models" / "seafood_model.pt"))
 
 # Ngưỡng độ tin cậy tối thiểu để 1 phát hiện được coi là hợp lệ — loại bỏ bớt
 # các phát hiện nhiễu (false positive) có độ tin cậy quá thấp. 0.35 là mức
