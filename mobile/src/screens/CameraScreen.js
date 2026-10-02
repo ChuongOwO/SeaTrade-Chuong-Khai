@@ -4,7 +4,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 
-export default function CameraScreen() {
+export default function CameraScreen({ navigation }) {
   const [facing, setFacing] = useState('back');
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
@@ -34,7 +34,10 @@ export default function CameraScreen() {
         'YOLOv8 AI Đã Phân Tích',
         'Loài: Cá Ngừ Vây Vàng\nĐộ tươi: Grade A (Tươi sống)\nGiá gợi ý: 185,000 đ/kg\nĐộ chính xác: 98.4%',
         [
-          { text: 'Đăng Bán Ngay', onPress: () => setScanned(false) },
+          { text: 'Đăng Bán Ngay', onPress: () => {
+              setScanned(false);
+              navigation.navigate('CreateBatch');
+          } },
           { text: 'Chụp Lại', onPress: () => setScanned(false), style: 'cancel' },
         ]
       );

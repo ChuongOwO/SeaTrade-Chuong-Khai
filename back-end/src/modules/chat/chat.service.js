@@ -19,11 +19,13 @@ const findOrCreateConversation = async (myId, peerId, listingId = null, orderId 
   const existing = await pool.query(
     `SELECT * FROM conversations
      WHERE ((buyer_id = $1 AND seller_id = $2) OR (buyer_id = $2 AND seller_id = $1))
-       AND listing_id IS NOT DISTINCT FROM $3
-       AND order_id IS NOT DISTINCT FROM $4`,
-    [myId, peerId, listingId, orderId]
+     ORDER BY updated_at DESC LIMIT 1`,
+    [myId, peerId]
   );
-  if (existing.rows[0]) return existing.rows[0];
+  if (existing.rows[0]) {
+    // Nếu có truyền listingId/orderId mới thì có thể cập nhật, nhưng tạm thời cứ dùng hội thoại cũ
+    return existing.rows[0];
+  }
 
   // Người bắt đầu cuộc trò chuyện được ghi là buyer_id theo quy ước đơn giản —
   // khi chưa gắn với 1 giao dịch cụ thể thì nhãn buyer/seller chỉ mang tính

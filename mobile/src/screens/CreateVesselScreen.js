@@ -11,11 +11,17 @@ export default function CreateVesselScreen({ navigation }) {
   
   const [vesselName, setVesselName] = useState('');
   const [vesselCode, setVesselCode] = useState('');
+  const [capacity, setCapacity] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegisterVessel = async () => {
-    if (!vesselName || !vesselCode) {
-      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ Tên tàu và Biển số.');
+    if (!vesselName || !vesselCode || !capacity) {
+      Alert.alert('Lỗi', 'Vui lòng điền đầy đủ Tên tàu, Biển số và Tải trọng.');
+      return;
+    }
+    
+    if (isNaN(capacity) || Number(capacity) <= 0) {
+      Alert.alert('Lỗi', 'Tải trọng phải là một số lớn hơn 0.');
       return;
     }
 
@@ -37,7 +43,8 @@ export default function CreateVesselScreen({ navigation }) {
         body: JSON.stringify({ 
           vessel_name: vesselName, 
           vessel_code: vesselCode, 
-          vessel_type: 'FISHING' // Mặc định cho ngư dân
+          vessel_type: 'FISHING', // Mặc định cho ngư dân
+          capacity_kg: Number(capacity) // Lấy từ input của người dùng
         })
       });
 
@@ -102,6 +109,18 @@ export default function CreateVesselScreen({ navigation }) {
                 value={vesselCode}
                 onChangeText={setVesselCode}
                 autoCapitalize="characters"
+              />
+            </View>
+
+            <View style={[styles.inputGroup, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
+              <Ionicons name="scale-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, { color: colors.textPrimary }]}
+                placeholder="Tải trọng (Kg) (VD: 5000)"
+                placeholderTextColor={colors.textMuted}
+                value={capacity}
+                onChangeText={setCapacity}
+                keyboardType="numeric"
               />
             </View>
 

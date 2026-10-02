@@ -24,12 +24,13 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.3.0",
     "pg": "^8.23.0",
+    "socket.io": "^4.8.4",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14",
-    "adm-zip": "^0.6.1"
+    "adm-zip": "^0.6.1",
+    "nodemon": "^3.1.14"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

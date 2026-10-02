@@ -111,6 +111,20 @@ router.get('/', batchController.getBatches);
 
 /**
  * @swagger
+ * /api/seafood/batches/market:
+ *   get:
+ *     summary: Lấy tất cả mẻ cá đang bán trên Chợ hải sản (AVAILABLE)
+ *     tags: [Seafood Batches]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách mẻ cá trên chợ
+ */
+router.get('/market', batchController.getMarketBatches);
+
+/**
+ * @swagger
  * /api/seafood/batches/{id}:
  *   get:
  *     summary: Xem chi tiết 1 lô hàng

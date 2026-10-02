@@ -5,25 +5,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme';
 import { fetchConversations, startConversation } from '../api/chatApi';
 import ChatThread from '../components/ChatThread';
 import { useNotifications } from '../context/NotificationContext';
-
-// Dữ liệu mẫu (mock) — tab "Giao dịch" chưa nối API lịch sử giao dịch thật vì
-// back-end hiện chưa có module đơn hàng (orders). Giữ nguyên như cũ, đồng đội
-// nối API thật cho phần này sau. Tab "Chat" (mới) đã gọi API chat thật —
-// xem back-end/src/modules/chat.
-const MOCK_HISTORY = [
-  { id: 'DH-1042', species: 'Cá Ngừ Vây Vàng', counterparty: 'Hải Nam 09', price: '190,000 đ/kg', quantity: '85 kg', date: '15/08/2026', status: 'COMPLETED' },
-  { id: 'DH-1041', species: 'Tôm Hùm Bông', counterparty: 'Phú Quốc King', price: '1,280,000 đ/kg', quantity: '12 kg', date: '13/08/2026', status: 'COMPLETED' },
-  { id: 'DH-1039', species: 'Cá Thu Thuận Hải', counterparty: 'Biển Đông 02', price: '220,000 đ/kg', quantity: '60 kg', date: '10/08/2026', status: 'CANCELLED' },
-  { id: 'DH-1035', species: 'Mực Lá Tươi', counterparty: 'Sông Tiền 01', price: '165,000 đ/kg', quantity: '40 kg', date: '05/08/2026', status: 'COMPLETED' },
-];
+import { API_URL } from '../config/api';
 
 const STATUS_LABEL = {
-  COMPLETED: 'Hoàn Tất',
-  CANCELLED: 'Đã Hủy',
+  PENDING: 'Chờ xác nhận',
+  CONFIRMED: 'Đã xác nhận',
+  IN_TRANSIT: 'Đang giao',
+  DELIVERED: 'Đã giao',
+  CANCELLED: 'Đã hủy',
+  REJECTED: 'Bị từ chối',
 };
 
 function formatTime(iso) {
@@ -32,16 +27,42 @@ function formatTime(iso) {
   return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function HistoryScreen() {
+export default function HistoryScreen({ route, navigation }) {
   const { unreadCount, refresh: refreshNotifications } = useNotifications();
   const [tab, setTab] = useState('TRANSACTIONS'); // 'TRANSACTIONS' | 'CHAT'
   const [conversations, setConversations] = useState([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [conversationsError, setConversationsError] = useState('');
   const [activeConversation, setActiveConversation] = useState(null);
+  const [targetOfferId, setTargetOfferId] = useState(null);
   const [newChatModalVisible, setNewChatModalVisible] = useState(false);
   const [peerPhoneInput, setPeerPhoneInput] = useState('');
   const [startingChat, setStartingChat] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [myUserId, setMyUserId] = useState(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('userData').then(raw => {
+      if (raw) try { setMyUserId(JSON.parse(raw).id); } catch {}
+    });
+  }, []);
+
+  const loadOrders = useCallback(async () => {
+    try {
+      setLoadingOrders(true);
+      const token = await AsyncStorage.getItem('userToken');
+      const res = await fetch(`${API_URL}/api/orders`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok && data.metadata) setOrders(data.metadata);
+    } catch (e) {
+      console.log('Error loading orders:', e.message);
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, []);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -61,20 +82,30 @@ export default function HistoryScreen() {
   }, []);
 
   useEffect(() => {
+    if (route.params?.openChat) {
+      setTab('CHAT');
+      setActiveConversation(route.params.openChat);
+      navigation.setParams({ openChat: undefined });
+    }
+  }, [route.params?.openChat, navigation]);
+
+  useEffect(() => {
     if (tab === 'CHAT' && !activeConversation) {
       loadConversations();
     }
-  }, [tab, activeConversation, loadConversations]);
+    if (tab === 'TRANSACTIONS') {
+      loadOrders();
+    }
+  }, [tab, activeConversation, loadConversations, loadOrders]);
 
-  const handleStartChat = async () => {
-    const phone = peerPhoneInput.trim();
+  const startChatWithPhone = async (phone, offerId = null) => {
     if (!phone) return;
     setStartingChat(true);
     try {
       const conversation = await startConversation(phone);
-      setNewChatModalVisible(false);
-      setPeerPhoneInput('');
       await loadConversations();
+      setTab('CHAT');
+      setTargetOfferId(offerId);
       setActiveConversation(conversation);
     } catch (err) {
       Alert.alert('Không bắt đầu được hội thoại', err.message || 'Có lỗi xảy ra.');
@@ -83,27 +114,59 @@ export default function HistoryScreen() {
     }
   };
 
+  const handleStartChat = async () => {
+    const phone = peerPhoneInput.trim();
+    if (phone) {
+      await startChatWithPhone(phone);
+      setNewChatModalVisible(false);
+      setPeerPhoneInput('');
+    }
+  };
+
   const renderTransactionItem = ({ item }) => {
-    const isCompleted = item.status === 'COMPLETED';
+    const isConfirmed = ['CONFIRMED', 'DELIVERED'].includes(item.status);
+    const isCancelled = ['CANCELLED', 'REJECTED'].includes(item.status);
+    const firstItem = item.items?.[0];
+    const speciesName = firstItem?.species_name || 'Hải sản';
+    const counterparty = item.buyer?.id === myUserId ? item.seller?.full_name : item.buyer?.full_name;
+    const isBuyer = item.buyer?.id === myUserId;
+    const formatDate = (iso) => {
+      if (!iso) return '';
+      return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+    const formatVND = (n) => Number(n).toLocaleString('vi-VN') + 'đ';
+
+    const counterpartyPhone = isBuyer ? item.seller?.phone : item.buyer?.phone;
+
     return (
-      <View style={styles.card}>
+      <TouchableOpacity 
+        style={styles.card} 
+        activeOpacity={0.7}
+        onPress={() => startChatWithPhone(counterpartyPhone, item.accepted_offer_id)}
+      >
         <View style={styles.cardTop}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.species}>{item.species}</Text>
-            <Text style={styles.meta}>{item.counterparty} • {item.quantity}</Text>
+            <Text style={styles.species}>{speciesName}</Text>
+            <Text style={styles.meta}>
+              {isBuyer ? 'Mua từ' : 'Bán cho'}: {counterparty} • {firstItem?.quantity_kg}kg
+            </Text>
           </View>
-          <View style={[styles.statusBadge, isCompleted ? styles.statusCompleted : styles.statusCancelled]}>
-            <Text style={[styles.statusText, isCompleted ? styles.statusTextCompleted : styles.statusTextCancelled]}>
-              {STATUS_LABEL[item.status]}
+          <View style={[styles.statusBadge, isConfirmed ? styles.statusCompleted : isCancelled ? styles.statusCancelled : styles.statusPending]}>
+            <Text style={[styles.statusText, isConfirmed ? styles.statusTextCompleted : isCancelled ? styles.statusTextCancelled : styles.statusTextPending]}>
+              {STATUS_LABEL[item.status] || item.status}
             </Text>
           </View>
         </View>
         <View style={styles.cardBottom}>
-          <Text style={styles.orderId}>{item.id}</Text>
-          <Text style={styles.price}>{item.price}</Text>
-          <Text style={styles.date}>{item.date}</Text>
+          <Text style={styles.orderId}>{item.id.substring(0, 8).toUpperCase()}</Text>
+          <Text style={styles.price}>{firstItem ? formatVND(firstItem.price_per_kg) + '/kg' : ''}</Text>
+          <Text style={styles.date}>{formatDate(item.created_at)}</Text>
         </View>
-      </View>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Tổng đơn:</Text>
+          <Text style={styles.totalValue}>{formatVND(item.total_amount)}</Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -129,8 +192,10 @@ export default function HistoryScreen() {
       <SafeAreaView style={styles.container} edges={['top']}>
         <ChatThread
           conversation={activeConversation}
+          targetOfferId={targetOfferId}
           onBack={() => {
             setActiveConversation(null);
+            setTargetOfferId(null);
             // Mở hội thoại đã tự đánh dấu tin nhắn + notification liên quan là
             // đã đọc ở back-end (xem chat.controller.js getMessages) — refresh
             // ngay ở đây để chấm đỏ trên sub-tab "Chat" cập nhật liền, không
@@ -146,11 +211,13 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Lịch Sử</Text>
-        {tab === 'CHAT' && (
-          <TouchableOpacity style={styles.newChatBtn} onPress={() => setNewChatModalVisible(true)}>
-            <Ionicons name="add-circle" size={26} color={colors.primary} />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={[styles.newChatBtn, { opacity: tab === 'CHAT' ? 1 : 0 }]}
+          onPress={() => tab === 'CHAT' && setNewChatModalVisible(true)}
+          disabled={tab !== 'CHAT'}
+        >
+          <Ionicons name="add-circle" size={26} color={colors.primary} />
+        </TouchableOpacity>
       </View>
 
       {/* 2 tab con: Giao dịch / Chat */}
@@ -175,17 +242,23 @@ export default function HistoryScreen() {
       </View>
 
       {tab === 'TRANSACTIONS' && (
-        MOCK_HISTORY.length === 0 ? (
+        loadingOrders ? (
+          <View style={styles.emptyContainer}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : orders.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="receipt-outline" size={48} color={colors.textFaint} />
-            <Text style={styles.emptyText}>Chưa có giao dịch nào gần đây.</Text>
+            <Text style={styles.emptyText}>Chưa có giao dịch nào.{"\n"}Thỏa thuận giá trong Chat để tạo đơn hàng!</Text>
           </View>
         ) : (
           <FlatList
-            data={MOCK_HISTORY}
+            data={orders}
             keyExtractor={item => item.id}
             renderItem={renderTransactionItem}
             contentContainerStyle={styles.list}
+            refreshing={loadingOrders}
+            onRefresh={loadOrders}
           />
         )
       )}
@@ -527,4 +600,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  statusPending: { backgroundColor: '#fef3c7' },
+  statusTextPending: { color: '#d97706' },
+  totalRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border,
+  },
+  totalLabel: { fontSize: 12, color: colors.textMuted },
+  totalValue: { fontSize: 15, fontWeight: 'bold', color: colors.success },
 });

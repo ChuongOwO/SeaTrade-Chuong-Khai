@@ -10,11 +10,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SEA_CENTER = { latitude: 10.3240, longitude: 107.1240 };
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ route, navigation }) {
   const { colors, isDarkMode } = useTheme();
   const mapRef = useRef(null);
 
   const [location, setLocation] = useState(null);
+  const [polyline, setPolyline] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
   const [locationSubscription, setLocationSubscription] = useState(null);
   const [demoOffset, setDemoOffset] = useState(null);
@@ -99,6 +100,25 @@ export default function HomeScreen({ navigation }) {
     const interval = setInterval(fetchVesselsLocations, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (route.params?.targetLocation && location) {
+      setPolyline([
+        { latitude: location.latitude, longitude: location.longitude },
+        { latitude: route.params.targetLocation.latitude, longitude: route.params.targetLocation.longitude }
+      ]);
+      if (mapRef.current) {
+        mapRef.current.animateToRegion({
+          latitude: route.params.targetLocation.latitude,
+          longitude: route.params.targetLocation.longitude,
+          latitudeDelta: 0.1,
+          longitudeDelta: 0.1,
+        });
+      }
+    } else {
+      setPolyline(null);
+    }
+  }, [route.params?.targetLocation, location]);
 
   const handleGetLocation = async () => {
     setIsLocating(true);
@@ -264,14 +284,15 @@ export default function HomeScreen({ navigation }) {
             markers={[
               ...(location ? [{ id: 'me', lat: location.latitude, lng: location.longitude, type: 'me', title: 'Vị trí của tôi' }] : []),
               ...liveVessels.map(v => ({ id: String(v.id), lat: v.lat, lng: v.lng, type: v.type, title: v.title })),
+              ...(route.params?.targetLocation ? [{ id: 'target', lat: route.params.targetLocation.latitude, lng: route.params.targetLocation.longitude, type: 'virtual', title: 'Mục tiêu (từ Chat)' }] : []),
             ]}
             polyline={
-              isNavigating && location && selectedVessel
+              polyline || (isNavigating && location && selectedVessel
                 ? [
                     { latitude: location.latitude, longitude: location.longitude },
                     { latitude: selectedVessel.lat, longitude: selectedVessel.lng },
                   ]
-                : null
+                : null)
             }
           />
         )}
