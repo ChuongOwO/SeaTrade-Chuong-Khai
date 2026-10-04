@@ -36,6 +36,11 @@ function formatVND(n) {
   return Number(n).toLocaleString('vi-VN') + 'đ';
 }
 
+function formatMessageTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
 export default function ChatThread({ conversation, onBack, targetOfferId }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -57,7 +62,7 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
   useEffect(() => {
     AsyncStorage.getItem('userData').then((raw) => {
       if (raw) {
-        try { setMyUserId(JSON.parse(raw).id); } catch {}
+        try { setMyUserId(JSON.parse(raw).id); } catch { }
       }
     });
     // Đọc negotiation context (nếu đến từ MarketScreen)
@@ -69,7 +74,7 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
             setNegotiation(ctx);
             setQtyInput(String(ctx.quantity_kg || ''));
           }
-        } catch {}
+        } catch { }
       }
     });
   }, [conversation.id]);
@@ -90,10 +95,10 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
   useEffect(() => {
     load();
     const interval = setInterval(() => load({ silent: true }), POLL_INTERVAL_MS);
-    
+
     // Khởi tạo kết nối Socket.io
     const socket = io(API_URL);
-    
+
     socket.on('connect', () => {
       // Đăng ký nhận thông báo có tin nhắn mới cho room này
       socket.on(`new_message_${conversation.id}`, () => {
@@ -116,7 +121,7 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
           try {
             const data = JSON.parse(m.message);
             return data.offer_id === targetOfferId;
-          } catch {}
+          } catch { }
         }
         return false;
       });
@@ -208,16 +213,6 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
     }
   };
 
-  const openLocationInMap = (lat, lng) => {
-    const url = Platform.select({
-      ios: `maps:0,0?q=${lat},${lng}`,
-      android: `geo:${lat},${lng}?q=${lat},${lng}`,
-    });
-    Linking.openURL(url).catch(() => {
-      Linking.openURL(`https://www.google.com/maps?q=${lat},${lng}`);
-    });
-  };
-
   // === Đề xuất giá ===
   const handleSubmitOffer = async () => {
     const price = parseFloat(priceInput);
@@ -261,47 +256,51 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
   const handleAcceptOffer = async (offerId) => {
     Alert.alert('Xác nhận', 'Bạn chắc chắn chấp nhận giá này và tạo đơn hàng?', [
       { text: 'Hủy', style: 'cancel' },
-      { text: 'Chấp nhận', onPress: async () => {
-        setSending(true);
-        try {
-          const token = await getToken();
-          const res = await fetch(`${API_URL}/api/offers/${offerId}/accept`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.message || 'Không thể chấp nhận');
-          await load({ silent: true });
-          setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-        } catch (err) {
-          Alert.alert('Lỗi', err.message);
-        } finally {
-          setSending(false);
+      {
+        text: 'Chấp nhận', onPress: async () => {
+          setSending(true);
+          try {
+            const token = await getToken();
+            const res = await fetch(`${API_URL}/api/offers/${offerId}/accept`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Không thể chấp nhận');
+            await load({ silent: true });
+            setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+          } catch (err) {
+            Alert.alert('Lỗi', err.message);
+          } finally {
+            setSending(false);
+          }
         }
-      }}
+      }
     ]);
   };
 
   const handleRejectOffer = async (offerId) => {
     Alert.alert('Xác nhận', 'Bạn chắc chắn từ chối đề xuất giá này?', [
       { text: 'Hủy', style: 'cancel' },
-      { text: 'Từ chối', style: 'destructive', onPress: async () => {
-        setSending(true);
-        try {
-          const token = await getToken();
-          const res = await fetch(`${API_URL}/api/offers/${offerId}/reject`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.message || 'Không thể từ chối');
-          await load({ silent: true });
-        } catch (err) {
-          Alert.alert('Lỗi', err.message);
-        } finally {
-          setSending(false);
+      {
+        text: 'Từ chối', style: 'destructive', onPress: async () => {
+          setSending(true);
+          try {
+            const token = await getToken();
+            const res = await fetch(`${API_URL}/api/offers/${offerId}/reject`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Không thể từ chối');
+            await load({ silent: true });
+          } catch (err) {
+            Alert.alert('Lỗi', err.message);
+          } finally {
+            setSending(false);
+          }
         }
-      }}
+      }
     ]);
   };
 
@@ -340,16 +339,14 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
   const renderBubble = (item) => {
     const isMine = item.sender_id === myUserId;
     const { type, data } = parseMessageContent(item.message);
-    const timeStr = item.created_at
-      ? new Date(item.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-      : '';
+    const timeStr = formatMessageTime(item.created_at);
 
     if (type === 'image') {
       const imageSource = data.base64 || data.uri;
       const aspect = data.width && data.height ? data.width / data.height : 4 / 3;
       return (
         <View style={[styles.bubbleRow, isMine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.bubble, styles.imageBubble]}
             activeOpacity={0.8}
             onPress={() => setFullScreenImage(imageSource)}
@@ -375,7 +372,7 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
               <Ionicons name="location" size={20} color={isMine ? '#fff' : colors.primary} />
               <Text style={[styles.locationText, isMine && { color: '#fff' }]}>Vị trí tàu</Text>
             </View>
-            
+
             <View style={styles.mapContainer}>
               <MapView
                 style={styles.miniMap}
@@ -395,7 +392,6 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
               <TouchableOpacity
                 style={styles.mapOverlay}
                 onPress={() => {
-                  // Chuyển sang Tab Home kèm toạ độ mục tiêu
                   navigation.navigate('Home', { targetLocation: { latitude: data.latitude, longitude: data.longitude } });
                 }}
               >
@@ -434,7 +430,6 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
               <Text style={styles.offerTotalLabel}>Tổng:</Text>
               <Text style={styles.offerTotal}>{formatVND(data.total)}</Text>
             </View>
-            {/* Nút Accept/Reject/Counter chỉ hiện cho người NHẬN offer và khi PENDING */}
             {!isMyOffer && isPending && (
               <View style={styles.offerActions}>
                 <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAcceptOffer(data.offer_id)}>
@@ -488,12 +483,24 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
       );
     }
 
-    // Text thường
+    // Text thường (kết hợp hỗ trợ tick xem tin nhắn)
     return (
       <View style={[styles.bubbleRow, isMine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
         <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
           <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{data}</Text>
-          <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>{timeStr}</Text>
+          <View style={styles.bubbleMetaRow}>
+            <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
+              {timeStr}
+            </Text>
+            {isMine && (
+              <Ionicons
+                name={item.is_read ? 'checkmark-done' : 'checkmark'}
+                size={13}
+                color="rgba(255,255,255,0.85)"
+                style={styles.bubbleTicks}
+              />
+            )}
+          </View>
         </View>
       </View>
     );
@@ -506,7 +513,7 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+        <TouchableOpacity onPress={onBack} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Quay lại danh sách hội thoại">
           <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{peerName}</Text>
@@ -595,6 +602,9 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
           style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
           onPress={handleSend}
           disabled={!input.trim() || sending}
+          accessibilityRole="button"
+          accessibilityLabel="Gửi tin nhắn"
+          accessibilityState={{ disabled: !input.trim() || sending }}
         >
           <Ionicons name="send" size={18} color="#fff" />
         </TouchableOpacity>
@@ -725,8 +735,10 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 14, color: colors.textPrimary },
   bubbleTextMine: { color: colors.textOnPrimary },
-  bubbleTime: { fontSize: 10, color: colors.textMuted, marginTop: 4, textAlign: 'right' },
-  bubbleTimeMine: { color: 'rgba(255,255,255,0.7)' },
+  bubbleMetaRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 3, gap: 3 },
+  bubbleTime: { fontSize: 10, color: colors.textFaint },
+  bubbleTimeMine: { color: 'rgba(255,255,255,0.85)' },
+  bubbleTicks: { marginLeft: 1 },
   bubbleTimeBelowImage: { fontSize: 10, color: colors.textMuted, marginTop: 4, textAlign: 'right' },
 
   imageBubble: { padding: 0, maxWidth: '75%', backgroundColor: 'transparent', borderWidth: 0 },

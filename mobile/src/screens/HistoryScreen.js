@@ -44,7 +44,7 @@ export default function HistoryScreen({ route, navigation }) {
 
   useEffect(() => {
     AsyncStorage.getItem('userData').then(raw => {
-      if (raw) try { setMyUserId(JSON.parse(raw).id); } catch {}
+      if (raw) try { setMyUserId(JSON.parse(raw).id); } catch { }
     });
   }, []);
 
@@ -64,23 +64,32 @@ export default function HistoryScreen({ route, navigation }) {
     }
   }, []);
 
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async ({ silent } = {}) => {
     try {
-      setLoadingConversations(true);
+      if (!silent) setLoadingConversations(true);
       const data = await fetchConversations();
       setConversations(data);
       setConversationsError('');
     } catch (err) {
-      setConversationsError(
-        err.status === 404
-          ? 'API chat chưa tồn tại trên back-end (404). Cần đồng đội xác nhận đã tạo module chat chưa.'
-          : (err.message || 'Không kết nối được tới máy chủ chat.')
-      );
+      // Lỗi ở lần poll nền (silent) không nên đè banner lỗi người dùng đang
+      // đọc dở — chỉ cập nhật lỗi khi đây là lần tải "chính" (mở tab/kéo refresh).
+      if (!silent) {
+        setConversationsError(
+          err.status === 404
+            ? 'API chat chưa tồn tại trên back-end (404). Cần đồng đội xác nhận đã tạo module chat chưa.'
+            : (err.message || 'Không kết nối được tới máy chủ chat.')
+        );
+      }
     } finally {
-      setLoadingConversations(false);
+      if (!silent) setLoadingConversations(false);
     }
   }, []);
 
+  // Tự làm mới danh sách hội thoại mỗi 8s khi đang đứng ở tab Chat (chưa mở
+  // hẳn 1 hội thoại) — cùng kiểu REST polling đang dùng ở ChatThread.js và
+  // NotificationContext.js. Nhờ vậy tin nhắn mới/preview cập nhật mà không
+  // cần thoát ra vào lại tab. {silent: true} để không nháy spinner mỗi lần
+  // poll nền (chỉ hiện spinner ở lần tải đầu hoặc khi người dùng chủ động kéo refresh).
   useEffect(() => {
     if (route.params?.openChat) {
       setTab('CHAT');
@@ -92,6 +101,8 @@ export default function HistoryScreen({ route, navigation }) {
   useEffect(() => {
     if (tab === 'CHAT' && !activeConversation) {
       loadConversations();
+      const interval = setInterval(() => loadConversations({ silent: true }), 8000);
+      return () => clearInterval(interval);
     }
     if (tab === 'TRANSACTIONS') {
       loadOrders();
@@ -139,8 +150,8 @@ export default function HistoryScreen({ route, navigation }) {
     const counterpartyPhone = isBuyer ? item.seller?.phone : item.buyer?.phone;
 
     return (
-      <TouchableOpacity 
-        style={styles.card} 
+      <TouchableOpacity
+        style={styles.card}
         activeOpacity={0.7}
         onPress={() => startChatWithPhone(counterpartyPhone, item.accepted_offer_id)}
       >
@@ -170,22 +181,49 @@ export default function HistoryScreen({ route, navigation }) {
     );
   };
 
-  const renderConversationItem = ({ item }) => (
-    <TouchableOpacity style={styles.chatCard} onPress={() => setActiveConversation(item)}>
-      <View style={styles.chatAvatar}>
-        <Ionicons name="person" size={22} color={colors.primary} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.chatPeerName} numberOfLines={1}>
-          {item.peer?.full_name || item.peer?.phone || 'Người dùng'}
-        </Text>
-        <Text style={styles.chatLastMessage} numberOfLines={1}>
-          {item.last_message || 'Chưa có tin nhắn'}
-        </Text>
-      </View>
-      <Text style={styles.chatTime}>{formatTime(item.updated_at)}</Text>
-    </TouchableOpacity>
-  );
+  const renderConversationItem = ({ item }) => {
+    // unread_count do back-end tính riêng cho từng hội thoại (chat.service.js
+    // listConversationsForUser) — khác với unreadCount toàn cục ở tab Chat,
+    // cái này cho biết CHÍNH XÁC cuộc trò chuyện nào có tin chưa đọc.
+    const unread = item.unread_count || 0;
+    const isUnread = unread > 0;
+    const peerName = item.peer?.full_name || item.peer?.phone || 'Người dùng';
+    return (
+      <TouchableOpacity
+        style={styles.chatCard}
+        onPress={() => setActiveConversation(item)}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isUnread
+            ? `Hội thoại với ${peerName}, ${unread} tin nhắn chưa đọc`
+            : `Hội thoại với ${peerName}`
+        }
+      >
+        <View style={styles.chatAvatarWrap}>
+          <View style={styles.chatAvatar}>
+            <Ionicons name="person" size={22} color={colors.primary} />
+          </View>
+          {isUnread && <View style={styles.chatAvatarDot} />}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.chatPeerName, isUnread && styles.chatPeerNameUnread]} numberOfLines={1}>
+            {peerName}
+          </Text>
+          <Text style={[styles.chatLastMessage, isUnread && styles.chatLastMessageUnread]} numberOfLines={1}>
+            {item.last_message || 'Chưa có tin nhắn'}
+          </Text>
+        </View>
+        <View style={styles.chatCardRight}>
+          <Text style={[styles.chatTime, isUnread && styles.chatTimeUnread]}>{formatTime(item.updated_at)}</Text>
+          {isUnread && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{unread > 9 ? '9+' : unread}</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (activeConversation) {
     return (
@@ -201,6 +239,10 @@ export default function HistoryScreen({ route, navigation }) {
             // ngay ở đây để chấm đỏ trên sub-tab "Chat" cập nhật liền, không
             // phải đợi tới lần poll định kỳ tiếp theo (tối đa 5s).
             refreshNotifications();
+            // Refresh luôn danh sách hội thoại (silent, không hiện spinner) để
+            // unread_count/badge của hội thoại vừa đọc biến mất ngay lập tức
+            // thay vì đợi vòng poll 8s tiếp theo.
+            loadConversations({ silent: true });
           }}
         />
       </SafeAreaView>
@@ -212,9 +254,13 @@ export default function HistoryScreen({ route, navigation }) {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Lịch Sử</Text>
         <TouchableOpacity
-          style={[styles.newChatBtn, { opacity: tab === 'CHAT' ? 1 : 0 }]}
-          onPress={() => tab === 'CHAT' && setNewChatModalVisible(true)}
+          style={[styles.newChatBtn, tab !== 'CHAT' && styles.newChatBtnHidden]}
+          onPress={() => setNewChatModalVisible(true)}
           disabled={tab !== 'CHAT'}
+          accessibilityElementsHidden={tab !== 'CHAT'}
+          importantForAccessibility={tab !== 'CHAT' ? 'no-hide-descendants' : 'yes'}
+          accessibilityRole="button"
+          accessibilityLabel="Nhắn tin mới"
         >
           <Ionicons name="add-circle" size={26} color={colors.primary} />
         </TouchableOpacity>
@@ -225,6 +271,9 @@ export default function HistoryScreen({ route, navigation }) {
         <TouchableOpacity
           style={[styles.tabBtn, tab === 'TRANSACTIONS' && styles.tabBtnActive]}
           onPress={() => setTab('TRANSACTIONS')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === 'TRANSACTIONS' }}
+          accessibilityLabel="Giao dịch"
         >
           <Ionicons name="receipt" size={16} color={tab === 'TRANSACTIONS' ? '#fff' : colors.textMuted} />
           <Text style={[styles.tabBtnText, tab === 'TRANSACTIONS' && styles.tabBtnTextActive]}>Giao dịch</Text>
@@ -232,6 +281,9 @@ export default function HistoryScreen({ route, navigation }) {
         <TouchableOpacity
           style={[styles.tabBtn, tab === 'CHAT' && styles.tabBtnActive]}
           onPress={() => setTab('CHAT')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === 'CHAT' }}
+          accessibilityLabel={unreadCount > 0 ? `Chat, ${unreadCount} tin nhắn chưa đọc` : 'Chat'}
         >
           <View>
             <Ionicons name="chatbubbles" size={16} color={tab === 'CHAT' ? '#fff' : colors.textMuted} />
@@ -272,7 +324,7 @@ export default function HistoryScreen({ route, navigation }) {
           <View style={styles.emptyContainer}>
             <Ionicons name="warning-outline" size={40} color={colors.danger} />
             <Text style={styles.errorText}>{conversationsError}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={loadConversations}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => loadConversations()} accessibilityRole="button" accessibilityLabel="Thử tải lại danh sách hội thoại">
               <Text style={styles.retryBtnText}>Thử lại</Text>
             </TouchableOpacity>
           </View>
@@ -280,7 +332,7 @@ export default function HistoryScreen({ route, navigation }) {
           <View style={styles.emptyContainer}>
             <Ionicons name="chatbubbles-outline" size={48} color={colors.textFaint} />
             <Text style={styles.emptyText}>Chưa có cuộc trò chuyện nào.</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => setNewChatModalVisible(true)}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => setNewChatModalVisible(true)} accessibilityRole="button" accessibilityLabel="Bắt đầu nhắn tin mới">
               <Text style={styles.retryBtnText}>+ Nhắn tin mới</Text>
             </TouchableOpacity>
           </View>
@@ -361,6 +413,8 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   newChatBtn: { padding: 2 },
+  // Ẩn "vô hình" (opacity 0) thay vì gỡ khỏi cây layout — xem giải thích ở JSX phía trên.
+  newChatBtnHidden: { opacity: 0 },
   tabBar: {
     flexDirection: 'row',
     margin: 16,
@@ -514,6 +568,9 @@ const styles = StyleSheet.create({
     borderColor: '#f1f5f9',
     gap: 10,
   },
+  chatAvatarWrap: {
+    position: 'relative',
+  },
   chatAvatar: {
     width: 42,
     height: 42,
@@ -522,9 +579,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Chấm đỏ nhỏ trên avatar — đánh dấu NGAY tại hội thoại nào có tin chưa đọc,
+  // để không phải đoán/đếm bằng chấm đỏ chung ở tab Chat nữa.
+  chatAvatarDot: {
+    position: 'absolute',
+    top: -1,
+    right: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.danger,
+    borderWidth: 2,
+    borderColor: colors.card,
+  },
   chatPeerName: {
     fontSize: 14,
     fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  chatPeerNameUnread: {
     color: colors.textPrimary,
   },
   chatLastMessage: {
@@ -532,9 +605,37 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
   },
+  // Tin nhắn cuối được in đậm + màu chữ đậm hơn khi hội thoại còn tin chưa đọc,
+  // giống quy ước của các app chat phổ biến.
+  chatLastMessageUnread: {
+    color: colors.textPrimary,
+    fontWeight: '700',
+  },
+  chatCardRight: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
   chatTime: {
     fontSize: 10,
     color: colors.textFaint,
+  },
+  chatTimeUnread: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  unreadBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    backgroundColor: colors.danger,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  unreadBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   modalOverlay: {
     flex: 1,

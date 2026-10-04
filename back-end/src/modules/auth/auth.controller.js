@@ -3,9 +3,15 @@ const jwt = require('jsonwebtoken');
 const pool = require('../../config/database');
 const env = require('../../config/env');
 
+// Vai trò được phép TỰ chọn khi đăng ký công khai (RBAC). Trước đây `role`
+// lấy thẳng từ req.body không kiểm tra gì -> ai cũng tự đăng ký được vai trò
+// ADMIN. Muốn có tài khoản Admin thật, phải tự đổi cột `role` trực tiếp trong
+// database, ví dụ: UPDATE users SET role = 'ADMIN' WHERE phone = '0912345678';
+const PUBLIC_REGISTER_ROLES = ['FISHERMAN', 'TRADER', 'COLLECTOR'];
+
 // [POST] /api/auth/register
 const register = async (req, res, next) => {
-  const { phone, email, password, full_name, role } = req.body;
+  const { phone, email, password, full_name } = req.body;
 
   try {
     // 1. Kiểm tra đầu vào cơ bản
@@ -23,8 +29,11 @@ const register = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    // 4. Mặc định role là FISHERMAN nếu không truyền
-    const userRole = role || 'FISHERMAN';
+    // 4. Chốt vai trò đăng ký: chỉ nhận giá trị trong danh sách cho phép tự
+    // chọn công khai (không bao giờ tin trực tiếp req.body.role); giá trị lạ
+    // hoặc bỏ trống -> mặc định FISHERMAN.
+    const requestedRole = (req.body.role || '').toString().toUpperCase();
+    const userRole = PUBLIC_REGISTER_ROLES.includes(requestedRole) ? requestedRole : 'FISHERMAN';
 
     // 5. Lưu vào database
     const insertQuery = `

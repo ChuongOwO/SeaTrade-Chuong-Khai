@@ -39,7 +39,7 @@ Hệ thống được thiết kế theo mô hình Microservices đa nền tảng
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        GIAO DIỆN NGƯỜI DÙNG                            │
 ├───────────────────────────────────┬────────────────────────────────────┤
-│ 💻 Web Admin Dashboard (ReactJS)  │ 📱 Mobile Application (Flutter)    │
+│ 💻 Web Admin Dashboard (ReactJS)  │ 📱 Mobile Application (React Native)│
 │ (Dành cho Ban quản lý & Doanh nghiệp)│ (Dành cho Thuyền trưởng & Thương lái)│
 └─────────────────┬─────────────────┴──────────────────┬─────────────────┘
                   │                                    │
@@ -61,41 +61,117 @@ Hệ thống được thiết kế theo mô hình Microservices đa nền tảng
 
 ## 3. HƯỚNG DẪN CÀI ĐẶT & KHỞI CHẠY MÃ NGUỒN
 
-### 3.1 Khởi Chạy Giao Diện Web Admin & Mobile Simulator (`web/`)
-Dự án giao diện được tích hợp đầy đủ phân hệ Web Admin, Mobile App Simulator, AI Vision Studio, Bản đồ GPS và Thống kê sản lượng.
+Hệ thống gồm **4 phần chạy độc lập, song song** (mỗi phần 1 cửa sổ terminal riêng,
+không tắt cửa sổ này khi mở cửa sổ khác): Back-end API (Node) → AI Service
+(Python) → Web Admin (Vite) → Mobile App (Expo). Làm theo đúng thứ tự dưới đây
+vì Back-end cần Database chạy trước, còn Mobile/Web cần Back-end (và AI Service,
+nếu muốn dùng tính năng Quét AI) chạy trước.
+
+Toàn bộ lệnh dưới đây chạy từ thư mục gốc đã `git clone` về máy (thay vì đường
+dẫn cứng của 1 máy cụ thể) — mở terminal, `cd` vào đúng thư mục gốc dự án trước
+khi làm theo từng bước.
+
+### 3.0 Yêu Cầu Môi Trường (cài 1 lần trên máy)
+
+- **Node.js** bản LTS (≥ 18) + **pnpm** (`npm install -g pnpm`) — dự án chuẩn
+  hoá dùng `pnpm` (xem `pnpm-lock.yaml` trong từng thư mục); dùng `npm install`
+  thay thế cũng chạy được nhưng đừng commit `package-lock.json` sinh ra.
+- **Python 3.10+** (kiểm tra bằng `python --version`), kèm `pip`.
+- **PostgreSQL 14+** cùng extension **PostGIS** (cài qua Stack Builder đi kèm
+  bộ cài PostgreSQL của EDB — xem chi tiết ở bước 3.2 bên dưới).
+- **Git** và app **Expo Go** (cài trên điện thoại thật từ App Store/CH Play) để
+  chạy thử mobile.
+- Máy tính chạy Back-end + AI Service và điện thoại chạy thử mobile phải **cùng
+  1 mạng Wi-Fi** (mobile tự dò IP LAN của máy tính qua Expo, xem ghi chú ở 3.5).
+
+### 3.1 Cài Đặt Database (`database/`)
+
+1. Mở **pgAdmin 4**, tạo 1 database rỗng tên **`seafood_trading`**.
+2. Mở Query Tool trên database vừa tạo, thử chạy `CREATE EXTENSION IF NOT EXISTS "postgis";`
+   — nếu báo lỗi không tìm thấy extension, mở **Stack Builder** → chọn đúng
+   version Postgres đang cài → mục *Spatial Extensions* → cài **PostGIS** rồi
+   thử lại. Câu lệnh tạo bảng thật đã có sẵn trong migration ở bước 3.2, bước
+   này chỉ để kiểm tra sớm PostGIS đã cài được chưa.
+
+Chi tiết đầy đủ (schema nào là bản chính thức, quy ước migration...) xem thêm
+`database/README.md` và `back-end/README.md`.
+
+### 3.2 Back-end API (`back-end/`) — chạy trước tiên
 
 ```bash
-# 1. Di chuyển vào thư mục web
-cd f:\Do-an-tot-nghiep\web
+cd back-end
 
-# 2. Cài đặt các gói phụ thuộc (npm dependencies)
-npm install
+# 1. Tạo file cấu hình kết nối từ file mẫu, rồi mở .env sửa lại mật khẩu
+#    Postgres đúng với máy bạn (KHÔNG commit file .env thật lên git)
+cp .env.example .env
 
-# 3. Chạy môi trường phát triển (Dev Server)
-npm run dev
+# 2. Cài dependencies
+pnpm install
+
+# 3. Chạy migration (Flyway) để tạo toàn bộ bảng — lần đầu sẽ tự tải Flyway
+#    CLI về (cần mạng, mất 1-2 phút), các lần sau chạy ngay
+pnpm run db:migrate
+
+# 4. Chạy server (tự reload khi sửa code)
+pnpm run dev
 ```
-Trình duyệt sẽ tự động mở địa chỉ: `http://localhost:3000`
+Server chạy ở `http://localhost:5000`. Xem `back-end/README.md` nếu gặp lỗi ở
+bước tạo database/migration.
 
-### 3.2 Khởi Chạy Mô-Đun AI Service (`ai-service/`)
-Mô-đun nhận dạng hình ảnh ứng dụng Python FastAPI và YOLOv8 model.
-
-```bash
-# 1. Di chuyển vào thư mục ai-service
-cd f:\Do-an-tot-nghiep\ai-service
-
-# 2. Cài đặt các thư viện cần thiết
-pip install -r requirements.txt
-
-### 3.3 Khởi Chạy Ứng Dụng Mobile Thực Tế (React Native/Expo)
-Mã nguồn ứng dụng Mobile dành cho Ngư Dân và Thương Lái được viết bằng React Native.
+### 3.3 AI Service (`ai-service/`) — FastAPI + YOLOv8
 
 ```bash
-# 1. Di chuyển vào thư mục mobile
-cd f:\Do-an-tot-nghiep\mobile
+cd ai-service
 
-# 2. Chạy ứng dụng trên thiết bị ảo hoặc máy thật (quét mã QR)
-npm run start
+# 1. Cài thư viện (sẽ kéo theo ultralytics + torch, khá nặng — có thể mất
+#    vài phút tuỳ mạng)
+python -m pip install -r requirements.txt
+
+# 2. (Khuyến nghị) Kiểm tra tên các lớp (class) thật của model đang có, để
+#    đối chiếu với bảng SPECIES_INFO trong app/services/inference.py — sửa
+#    lại dict đó nếu tên lớp in ra không khớp
+python -c "from ultralytics import YOLO; print(YOLO('ml-models/shrimp_model.pt').names)"
+
+# 3. Chạy server — dùng python -m để chắc chắn chạy đúng bản Python vừa cài
+#    thư viện ở bước 1 (tránh lỗi ModuleNotFoundError do máy có nhiều bản
+#    Python song song)
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
 ```
+Server chạy ở `http://localhost:8000` (xem thử tại `http://localhost:8000/docs`).
+
+**Lưu ý quan trọng (Windows):** để điện thoại (mobile app) gọi được vào server
+này qua Wi-Fi LAN, cần mở cổng 8000 trên Windows Firewall — mở **PowerShell
+với quyền Administrator** rồi chạy 1 lần:
+```powershell
+New-NetFirewallRule -DisplayName "AI Service Uvicorn 8000" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow
+```
+(Back-end ở cổng 5000 thường đã được Windows tự hỏi/cho phép từ trước; nếu
+mobile gọi được cổng 5000 nhưng không gọi được cổng 8000 thì gần như chắc chắn
+là do thiếu rule tường lửa này).
+
+### 3.4 Web Admin Dashboard (`web/`)
+
+```bash
+cd web
+pnpm install
+pnpm run dev
+```
+Trình duyệt tự mở `http://localhost:3000`. Cần Back-end (3.2) đã chạy để các
+trang có dữ liệu thật thay vì dữ liệu mẫu.
+
+### 3.5 Mobile App (`mobile/`) — React Native / Expo
+
+```bash
+cd mobile
+pnpm install
+pnpm run start
+```
+Quét mã QR hiện ra bằng app **Expo Go** trên điện thoại thật (điện thoại phải
+cùng mạng Wi-Fi với máy tính đang chạy Back-end/AI Service). App tự dò IP LAN
+của máy tính qua Expo (`mobile/src/config/api.js`) nên thường không cần sửa gì
+thêm; nếu app báo không kết nối được máy chủ, kiểm tra lại điện thoại có đúng
+cùng Wi-Fi và tường lửa (mục 3.3) đã mở cổng chưa.
+
 ---
 
 ## 4. HƯỚNG DẪN VẬN HÀNH WEB ADMIN DASHBOARD
@@ -140,7 +216,15 @@ Mô phỏng ứng dụng di động thực tế với 2 vai trò linh hoạt:
 
 ## 6. HƯỚNG DẪN SỬ DỤNG MÔ-ĐUN XỬ LÝ ẢNH AI YOLOV8
 
-Mô-đun Studio AI cho phép kiểm thử chuyên sâu thuật toán Computer Vision:
+> **Lưu ý trạng thái hiện tại:** tab **"Quét AI"** trên **Mobile App** đã gọi
+> **YOLOv8 thật** (chụp ảnh camera → gửi lên `ai-service` → nhận kết quả nhận
+> diện thật, xem mục 3.3 để chạy `ai-service`). Mô-đun **"Studio AI Vision"**
+> bên **Web Admin** ở phần dưới đây **vẫn đang là bản demo/giả lập** (số liệu
+> % độ tin cậy/độ tươi sinh ngẫu nhiên để minh hoạ giao diện), **chưa** gọi
+> `ai-service` thật — cần lưu ý khi demo cho hội đồng để tránh nhầm lẫn giữa 2
+> phần.
+
+Mô-đun Studio AI (Web) cho phép kiểm thử chuyên sâu thuật toán Computer Vision:
 
 1. Chọn tab **"Mô-đun AI Vision Scan"** trên Navbar.
 2. **Chọn ảnh mẫu:** Click vào bộ ảnh mẫu thử nghiệm (Cá Ngừ Vây Vàng, Cá Thu Thuận Hải, Tôm Hùm Bông, Mực Lá Đại Dương, Cua Biển Cà Mau) hoặc bấm **"Tải Ảnh Thực Tế Từ Máy"**.
@@ -175,9 +259,13 @@ Mô-đun Studio AI cho phép kiểm thử chuyên sâu thuật toán Computer Vi
 - ✅ **Bảo toàn dữ liệu:** Không xóa bất kỳ thư mục hay tệp tin cũ nào của dự án.
 
 ### 8.2 Bàn Giao Mã Nguồn
-- **Mã nguồn Giao diện:** Thư mục `web/`
+- **Mã nguồn Web Admin:** Thư mục `web/`
+- **Mã nguồn Back-end API:** Thư mục `back-end/`
 - **Mã nguồn AI Service:** Thư mục `ai-service/`
-- **Tài liệu hướng dẫn:** Tệp `HUONG_DAN_SU_DUNG.md` tại thư mục gốc.
+- **Mã nguồn Mobile App:** Thư mục `mobile/`
+- **Tài liệu hướng dẫn cài đặt & khởi chạy:** Mục 3 của chính tệp `README.md`
+  này; chi tiết riêng từng phần xem thêm `back-end/README.md` và
+  `database/README.md`.
 
 ---
 *Tài liệu được biên soạn phục vụ Hội đồng Đánh giá Đồ án Tốt nghiệp CNTT năm 2026.*

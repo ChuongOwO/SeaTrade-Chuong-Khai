@@ -153,6 +153,30 @@ const getMyVesselInfo = async (req, res, next) => {
   }
 };
 
+// [POST] /api/vessels/:id/locations — Ghi nhận vị trí GPS mới (mobile gửi định kỳ)
+const addVesselLocation = async (req, res, next) => {
+  try {
+    const vessel_id = req.params.id;
+    const owner_id = req.user.id;
+
+    const newLocation = await vesselService.addVesselLocation(vessel_id, owner_id, req.body);
+    if (!newLocation) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Không tìm thấy tàu hoặc bạn không có quyền ghi vị trí cho tàu này'
+      });
+    }
+
+    res.status(201).json({
+      status: 201,
+      message: 'Ghi nhận vị trí GPS thành công',
+      metadata: newLocation
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getNavigationToVessel = async (req, res, next) => {
   try {
     const { lat, lng } = req.query;
@@ -190,4 +214,5 @@ module.exports = {
   getVesselsLocations,
   getMyVesselInfo,
   getNavigationToVessel,
+  addVesselLocation,
 };

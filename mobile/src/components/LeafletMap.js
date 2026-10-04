@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { MAP_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_TILE_SUBDOMAINS, MAP_TILE_MAX_ZOOM } from '../config/mapTiles';
 
 /**
  * LeafletMap: Bản đồ OSM hoàn chỉnh dùng Leaflet.js bên trong WebView (CDN).
@@ -103,9 +104,11 @@ function buildHtml(lat, lng, zoom) {
 var map = L.map('map', { zoomControl: true }).setView([${lat}, ${lng}], ${zoom});
 window._map = map;
 
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; OpenStreetMap'
+// Nguồn tile lấy từ config/mapTiles.js — đổi nguồn bản đồ chỉ cần sửa file đó.
+L.tileLayer('${MAP_TILE_URL}', {
+  ${MAP_TILE_SUBDOMAINS ? `subdomains: '${MAP_TILE_SUBDOMAINS}',` : ''}
+  maxZoom: ${MAP_TILE_MAX_ZOOM},
+  attribution: '${MAP_TILE_ATTRIBUTION}'
 }).addTo(map);
 
 map.on('click', function() {

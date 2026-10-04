@@ -13,6 +13,7 @@ import {
   Ship,
   LogOut
 } from 'lucide-react';
+import { getAllowedTabs } from '../config/permissions';
 
 const NAV_GROUPS = [
   {
@@ -42,7 +43,20 @@ const NAV_GROUPS = [
 
 // Sidebar điều hướng — thay cho thanh nav ngang trước đây từng phải nhồi 8 tab
 // vào 1 hàng (rất rối khi nhiều màn hình). Nhóm theo chức năng, xếp dọc.
+//
+// RBAC: mỗi mục chỉ hiện ra nếu vai trò hiện tại (currentUser.role) được phép
+// dùng tab đó theo config/permissions.js — 1 nhóm không còn mục nào (VD:
+// "Quản Trị Hệ Thống" với Thuyền Trưởng/Thương Lái) sẽ bị ẩn cả nhóm luôn,
+// tránh hiện tiêu đề nhóm trống trơn.
 export default function Navbar({ activeTab, setActiveTab, offlineMode, setOfflineMode, currentUser, onLogout }) {
+  const allowedTabs = getAllowedTabs(currentUser?.role);
+  const visibleGroups = NAV_GROUPS
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => allowedTabs.includes(item.id))
+    }))
+    .filter((group) => group.items.length > 0);
+
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -51,14 +65,14 @@ export default function Navbar({ activeTab, setActiveTab, offlineMode, setOfflin
             <Anchor className="w-4.5 h-4.5 text-white animate-float" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-sm font-extrabold tracking-tight text-slate-900 truncate">SeaTrade AI</h1>
+            <h1 className="font-display text-sm font-extrabold tracking-tight text-slate-900 truncate">SeaTrade AI</h1>
             <p className="text-[11px] text-slate-400 truncate">Giao thương hải sản & AI</p>
           </div>
         </div>
       </div>
 
       <nav className="sidebar-nav">
-        {NAV_GROUPS.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label}>
             <p className="sidebar-nav-group-label">{group.label}</p>
             {group.items.map((item) => {
@@ -69,6 +83,8 @@ export default function Navbar({ activeTab, setActiveTab, offlineMode, setOfflin
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
                   title={item.label}
+                  aria-label={item.label}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`sidebar-nav-item w-full ${isActive ? 'active' : ''}`}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
@@ -89,6 +105,7 @@ export default function Navbar({ activeTab, setActiveTab, offlineMode, setOfflin
               : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
           }`}
           title="Mô phỏng sóng yếu ngoài khơi: Lưu dữ liệu ngoại tuyến (Offline Sync)"
+          aria-label={offlineMode ? 'Đang bật chế độ Offline, bấm để chuyển sang GPS & 4G Online' : 'Đang bật GPS & 4G Online, bấm để chuyển sang chế độ Offline'}
         >
           {offlineMode ? <Radio className="w-3.5 h-3.5 animate-pulse shrink-0" /> : <Wifi className="w-3.5 h-3.5 shrink-0" />}
           <span className="sidebar-label-full truncate">{offlineMode ? 'Chế độ Offline' : 'GPS & 4G Online'}</span>
@@ -106,6 +123,7 @@ export default function Navbar({ activeTab, setActiveTab, offlineMode, setOfflin
             <button
               onClick={onLogout}
               title="Đăng xuất"
+              aria-label="Đăng xuất"
               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
             >
               <LogOut className="w-3.5 h-3.5" />

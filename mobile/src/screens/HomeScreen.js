@@ -76,7 +76,7 @@ export default function HomeScreen({ route, navigation }) {
         const res = await fetch(`${API_URL}/api/vessels/my-vessel`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         if (res.status === 404) {
           Alert.alert(
             'Chưa đăng ký tàu',
@@ -187,7 +187,7 @@ export default function HomeScreen({ route, navigation }) {
 
       if (data.status === 200) {
         const nav = data.metadata;
-        
+
         // Nếu app chưa có GPS, lấy vị trí của tàu user trên DB làm điểm bắt đầu
         if (!location) {
           setLocation({
@@ -196,12 +196,12 @@ export default function HomeScreen({ route, navigation }) {
           });
           // Focus map vào tàu của mình
           if (mapRef.current) {
-             mapRef.current.animateToRegion({
-               latitude: nav.current_vessel.latitude,
-               longitude: nav.current_vessel.longitude,
-               latitudeDelta: 0.2,
-               longitudeDelta: 0.2,
-             });
+            mapRef.current.animateToRegion({
+              latitude: nav.current_vessel.latitude,
+              longitude: nav.current_vessel.longitude,
+              latitudeDelta: 0.2,
+              longitudeDelta: 0.2,
+            });
           }
         }
 
@@ -222,7 +222,7 @@ export default function HomeScreen({ route, navigation }) {
           setSelectedVessel(found);
           setIsNavigating(false);
         }
-        
+
         // Nếu lỗi là chưa đăng ký tàu, prompt user
         if (data.status === 404 && data.message.includes('chưa đăng ký tàu')) {
           Alert.alert(
@@ -289,9 +289,9 @@ export default function HomeScreen({ route, navigation }) {
             polyline={
               polyline || (isNavigating && location && selectedVessel
                 ? [
-                    { latitude: location.latitude, longitude: location.longitude },
-                    { latitude: selectedVessel.lat, longitude: selectedVessel.lng },
-                  ]
+                  { latitude: location.latitude, longitude: location.longitude },
+                  { latitude: selectedVessel.lat, longitude: selectedVessel.lng },
+                ]
                 : null)
             }
           />

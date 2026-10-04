@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import io from 'socket.io-client';
 import Navbar from './components/Navbar';
 import LoginScreen from './components/LoginScreen';
 import AdminDashboard from './components/AdminDashboard';
@@ -15,6 +14,8 @@ import { INITIAL_POSTS, INITIAL_VESSELS, INITIAL_ORDERS } from './data/mockData'
 import { getToken } from './api/client';
 import { fetchCurrentUser, logoutAccount } from './api/auth';
 import { buildUserFromBackend } from './api/roleMeta';
+import { canAccessTab } from './config/permissions';
+import { ShieldAlert } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -50,59 +51,14 @@ export default function App() {
     })();
   }, []);
 
-  useEffect(() => {
-    // Kết nối tới Socket.IO Server Backend (dùng cho radar vị trí tàu real-time,
-    // KHÔNG liên quan tới tính năng Chat — xem ChatPanel.jsx dùng REST polling riêng).
-    const socket = io('http://localhost:5000');
-
-    socket.on('connect', () => {
-      console.log('📡 [Web] Đã kết nối Radar Server');
-    });
-
-    socket.on('vessel_location_update', (data) => {
-      // Map data từ Simulator về cấu trúc vessel của Web
-      // Simulator data: { vesselId, jobType, lat, lng, heading, speed, timestamp }
-
-      setVessels(prevVessels => {
-        const existingIdx = prevVessels.findIndex(v => v.code === data.vesselId);
-
-        if (existingIdx >= 0) {
-          // Cập nhật vị trí tàu cũ
-          const updated = [...prevVessels];
-          updated[existingIdx] = {
-            ...updated[existingIdx],
-            lat: data.lat,
-            lng: data.lng,
-            speedKnots: data.speed,
-            lastSeen: data.timestamp
-          };
-          return updated;
-        } else {
-          // Thêm tàu mới chưa từng có trên bản đồ
-          const newVessel = {
-            id: prevVessels.length > 0 ? Math.max(...prevVessels.map(v => v.id)) + 1 : 1,
-            code: data.vesselId,
-            name: `Tàu ${data.jobType}`,
-            captain: 'Thuyền trưởng Ảo',
-            phone: '0900000000',
-            type: data.jobType === 'Thu gom' ? 'collector' : 'fishing', // Chuyển đổi loại
-            lat: data.lat,
-            lng: data.lng,
-            homePort: 'Cảng Cát Lở',
-            speedKnots: data.speed,
-            batteryPercent: Math.floor(Math.random() * 50) + 50,
-            status: 'at-sea',
-            lastSeen: data.timestamp
-          };
-          return [...prevVessels, newVessel];
-        }
-      });
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
+  // Lưu ý: trước đây ở đây có 1 kết nối Socket.IO client lắng nghe sự kiện
+  // 'vessel_location_update' để cập nhật vị trí tàu real-time cho state
+  // `vessels` dùng chung toàn app. Đã bỏ vì back-end/src/server.js không hề
+  // chạy Socket.IO server (chỉ Express thuần) nên kết nối này không bao giờ
+  // nhận được gì — chỉ gây lỗi kết nối lặp lại trên console (xem lỗi
+  // "socket.io/... 404" đã gặp lúc test web). Vị trí tàu thật cho tab "Bản Đồ
+  // Hải Trình" giờ lấy trực tiếp từ GET /api/vessels/locations ngay trong
+  // MaritimeMap.jsx (tự poll mỗi 10s, xem web/src/api/vessels.js).
 
   const handleLogin = (user) => {
     setCurrentUser(user);
@@ -131,8 +87,17 @@ export default function App() {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
+  // RBAC: kiểm tra lại lần nữa (ngoài việc Navbar đã ẩn sẵn các mục không được
+  // phép) trước khi render nội dung tab thật — phòng trường hợp activeTab bị
+  // set sai giá trị vì lý do gì đó (state cũ còn sót lại, thao tác thủ công...).
+  const canViewActiveTab = canAccessTab(currentUser.role, activeTab);
+
   return (
     <div className="app-shell app-layout bg-slate-50 text-slate-900 font-sans selection:bg-sky-500 selection:text-white">
+
+      {/* Skip link cho người dùng bàn phím/trình đọc màn hình: nhảy thẳng qua
+          sidebar để tới nội dung chính, hiện ra khi focus (Tab đầu tiên). */}
+      <a href="#main-content" className="skip-link">Bỏ qua để tới nội dung chính</a>
 
       <Navbar
         activeTab={activeTab}
@@ -144,9 +109,20 @@ export default function App() {
       />
 
       <div className="app-main">
-      <main className="site-main flex-1 w-full site-container">
+      <main id="main-content" className="site-main flex-1 w-full site-container">
 
-        {activeTab === 'admin' && (
+        {!canViewActiveTab && (
+          <div className="page-section flex flex-col items-center justify-center text-center py-16 gap-3">
+            <ShieldAlert className="w-10 h-10 text-rose-400" />
+            <h2 className="text-base font-bold text-slate-700">Bạn không có quyền truy cập mục này</h2>
+            <p className="text-sm text-slate-500 max-w-sm">
+              Tài khoản vai trò <strong>{currentUser.roleLabel}</strong> không được cấp quyền dùng chức năng này.
+              Vui lòng chọn mục khác trong menu bên trái.
+            </p>
+          </div>
+        )}
+
+        {canViewActiveTab && activeTab === 'admin' && (
           <AdminDashboard
             posts={posts}
             setPosts={setPosts}
@@ -155,21 +131,21 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'orders' && (
+        {canViewActiveTab && activeTab === 'orders' && (
           <OrderManagement
             orders={orders}
             setOrders={setOrders}
           />
         )}
 
-        {activeTab === 'fleet' && (
+        {canViewActiveTab && activeTab === 'fleet' && (
           <FleetManagement
             vessels={vessels}
             setVessels={setVessels}
           />
         )}
 
-        {activeTab === 'mobile' && (
+        {canViewActiveTab && activeTab === 'mobile' && (
           <MobileAppSimulator
             posts={posts}
             setPosts={setPosts}
@@ -183,11 +159,11 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'ai-vision' && (
+        {canViewActiveTab && activeTab === 'ai-vision' && (
           <AIVisionPlayground />
         )}
 
-        {activeTab === 'sea-map' && (
+        {canViewActiveTab && activeTab === 'sea-map' && (
           <MaritimeMap
             vessels={vessels}
             posts={posts}
@@ -195,7 +171,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'analytics' && (
+        {canViewActiveTab && activeTab === 'analytics' && (
           <AnalyticsView
             posts={posts}
             orders={orders}
@@ -203,7 +179,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'user-manual' && (
+        {canViewActiveTab && activeTab === 'user-manual' && (
           <UserManual />
         )}
 

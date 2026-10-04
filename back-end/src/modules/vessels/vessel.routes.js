@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const vesselController = require('./vessel.controller');
-const { createVesselSchema, updateVesselSchema, validate } = require('./vessel.validation');
+const { createVesselSchema, updateVesselSchema, addLocationSchema, validate } = require('./vessel.validation');
 const authMiddleware = require('../../middleware/auth.middleware');
 
 // Áp dụng middleware auth cho TOÀN BỘ các route của Vessels
@@ -116,6 +116,56 @@ router.get('/locations', vesselController.getVesselsLocations);
  *         description: Chưa đăng nhập
  */
 router.get('/my-vessel', vesselController.getMyVesselInfo);
+
+/**
+ * @swagger
+ * /api/vessels/{id}/locations:
+ *   post:
+ *     summary: Ghi nhận vị trí GPS mới cho tàu (Mobile App gửi định kỳ vị trí thật)
+ *     tags: [Vessels]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID của con tàu (phải thuộc quyền sở hữu của user đang đăng nhập)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - latitude
+ *               - longitude
+ *             properties:
+ *               latitude:
+ *                 type: number
+ *                 example: 10.324
+ *               longitude:
+ *                 type: number
+ *                 example: 107.124
+ *               speed:
+ *                 type: number
+ *                 description: Tốc độ (hải lý/h)
+ *                 example: 5.2
+ *               heading:
+ *                 type: number
+ *                 description: Hướng đi (độ, 0-360)
+ *                 example: 45
+ *     responses:
+ *       201:
+ *         description: Ghi nhận vị trí thành công
+ *       400:
+ *         description: Dữ liệu không hợp lệ
+ *       404:
+ *         description: Không tìm thấy tàu hoặc không có quyền
+ */
+router.post('/:id/locations', validate(addLocationSchema), vesselController.addVesselLocation);
 
 /**
  * @swagger
