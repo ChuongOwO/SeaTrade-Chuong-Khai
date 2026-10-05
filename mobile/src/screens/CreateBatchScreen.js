@@ -8,20 +8,34 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config/api';
 import { useTheme } from '../context/ThemeContext';
+import { publishBatchFromScan } from '../api/batchApi';
 
-export default function CreateBatchScreen({ navigation }) {
+// So khớp tên loài AI trả về (species_group) với name_vi trong DB — chuẩn hoá
+// Unicode vì chuỗi tiếng Việt có thể ở dạng dựng sẵn hoặc tổ hợp dấu.
+const normalizeName = (name) => (name || '').normalize('NFC').trim().toLowerCase();
+
+export default function CreateBatchScreen({ navigation, route }) {
   const { colors, isDarkMode } = useTheme();
-  
+
+  // Có scan = mở từ màn Quét AI (CameraScreen) -> điền sẵn ảnh, loài, giá
+  const scan = route?.params?.scan;
+  const detection = scan?.detection;
+
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
-  
+
   const [vesselId, setVesselId] = useState(null);
+  const [vesselLocation, setVesselLocation] = useState(null);
   const [speciesList, setSpeciesList] = useState([]);
-  
+
   // Form State
   const [selectedSpecies, setSelectedSpecies] = useState(null);
   const [quantity, setQuantity] = useState('');
   const [qualityLevel, setQualityLevel] = useState('GOOD');
+  const [price, setPrice] = useState(
+    detection?.estimated_price_per_kg ? String(detection.estimated_price_per_kg) : ''
+  );
+  const [isSpeciesFromAi, setIsSpeciesFromAi] = useState(false);
   
   // Modals
   const [showSpeciesModal, setShowSpeciesModal] = useState(false);
@@ -51,6 +65,13 @@ export default function CreateBatchScreen({ navigation }) {
           return;
         }
         setVesselId(vesselData.metadata.vessel_id);
+        // Vị trí GPS mới nhất của tàu = nơi đánh bắt mẻ cá đang đăng
+        if (vesselData.metadata.latitude != null) {
+          setVesselLocation({
+            latitude: Number(vesselData.metadata.latitude),
+            longitude: Number(vesselData.metadata.longitude),
+          });
+        }
 
         // 2. Fetch Species List
         const speciesRes = await fetch(`${API_URL}/api/seafood/species`, {
@@ -59,7 +80,15 @@ export default function CreateBatchScreen({ navigation }) {
         const speciesData = await speciesRes.json();
         if (speciesRes.ok && speciesData.metadata) {
           setSpeciesList(speciesData.metadata);
-          if (speciesData.metadata.length > 0) {
+          if (scan) {
+            // Chọn sẵn loài AI nhận diện; không khớp loài nào trong danh mục
+            // thì để trống, bắt người dùng tự chọn thay vì gán bừa loài đầu tiên
+            const aiSpecies = speciesData.metadata.find(
+              (s) => normalizeName(s.name_vi) === normalizeName(detection?.species_group)
+            );
+            setSelectedSpecies(aiSpecies || null);
+            setIsSpeciesFromAi(Boolean(aiSpecies));
+          } else if (speciesData.metadata.length > 0) {
             setSelectedSpecies(speciesData.metadata[0]);
           }
         }
@@ -80,6 +109,11 @@ export default function CreateBatchScreen({ navigation }) {
     }
     if (!quantity || isNaN(quantity) || Number(quantity) <= 0) {
       Alert.alert('Lỗi', 'Vui lòng nhập số lượng (kg) hợp lệ.');
+      return;
+    }
+
+    if (scan) {
+      await submitFromScan();
       return;
     }
 
@@ -125,6 +159,42 @@ export default function CreateBatchScreen({ navigation }) {
     }
   };
 
+  // Đăng kèm ảnh quét + kết quả AI + giá bán (POST /api/seafood/batches/from-scan)
+  const submitFromScan = async () => {
+    if (!price || isNaN(price) || Number(price) <= 0) {
+      Alert.alert('Lỗi', 'Vui lòng nhập giá bán (đ/kg) hợp lệ.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await publishBatchFromScan(scan.photoUri, {
+        vessel_id: vesselId,
+        species_id: selectedSpecies.id,
+        quantity_kg: Number(quantity),
+        price_per_kg: Number(price),
+        quality_level: qualityLevel,
+        latitude: vesselLocation?.latitude,
+        longitude: vesselLocation?.longitude,
+        ai_model_version: scan.modelVersion,
+        ai_confidence: detection?.confidence,
+        ai_x1: detection?.box?.x1,
+        ai_y1: detection?.box?.y1,
+        ai_x2: detection?.box?.x2,
+        ai_y2: detection?.box?.y2,
+      });
+      Alert.alert(
+        'Đã Đăng Lên Chợ',
+        `${selectedSpecies.name_vi} ${quantity} kg — ${Number(price).toLocaleString('vi-VN')} đ/kg đã hiển thị trên Chợ hải sản.`,
+        [{ text: 'Xem Chợ', onPress: () => navigation.navigate('MainTabs', { screen: 'Market' }) }]
+      );
+    } catch (e) {
+      Alert.alert('Đăng Bán Thất Bại', e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (initializing) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
@@ -147,13 +217,36 @@ export default function CreateBatchScreen({ navigation }) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
           
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: DUMMY_IMAGE }} style={styles.mainImage} />
-            <View style={styles.imageOverlay}>
-              <Ionicons name="camera" size={32} color="#fff" />
-              <Text style={styles.imageOverlayText}>Chế độ Camera AI đang bảo trì</Text>
+          {scan ? (
+            <View style={styles.imageContainer}>
+              <Image source={{ uri: scan.photoUri }} style={styles.scanImage} />
+              <View style={[styles.aiBadge, scan.needsReview && styles.aiBadgeWarning]}>
+                <Ionicons name={scan.needsReview ? 'alert-circle' : 'sparkles'} size={14} color="#fff" />
+                <Text style={styles.aiBadgeText}>
+                  AI: {detection?.label_vi} • {(detection?.confidence * 100).toFixed(0)}%
+                </Text>
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.imageContainer}>
+              <Image source={{ uri: DUMMY_IMAGE }} style={styles.mainImage} />
+              <View style={styles.imageOverlay}>
+                <Ionicons name="camera" size={32} color="#fff" />
+                <Text style={styles.imageOverlayText}>Dùng tab Quét AI để đăng bán kèm ảnh thật</Text>
+              </View>
+            </View>
+          )}
+
+          {scan && (scan.needsReview || !isSpeciesFromAi) && (
+            <View style={[styles.hintBox, { borderColor: colors.warningAccent || '#f59e0b' }]}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.warningAccent || '#f59e0b'} />
+              <Text style={[styles.hintText, { color: colors.textPrimary }]}>
+                {!isSpeciesFromAi
+                  ? `"${detection?.label_vi}" chưa có trong danh mục loài — vui lòng chọn loài phù hợp.`
+                  : 'AI chưa chắc chắn về kết quả — hãy kiểm tra lại loài trước khi đăng.'}
+              </Text>
+            </View>
+          )}
 
           <View style={[styles.formContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             
@@ -166,6 +259,7 @@ export default function CreateBatchScreen({ navigation }) {
               <Ionicons name="fish-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
               <Text style={[styles.inputText, { color: selectedSpecies ? colors.textPrimary : colors.textMuted }]}>
                 {selectedSpecies ? selectedSpecies.name_vi : 'Chọn loài hải sản...'}
+                {isSpeciesFromAi && <Text style={{ color: colors.primary, fontSize: 13 }}>  ✓ AI nhận diện</Text>}
               </Text>
               <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
             </TouchableOpacity>
@@ -184,6 +278,25 @@ export default function CreateBatchScreen({ navigation }) {
               />
               <Text style={{ color: colors.textMuted, fontWeight: 'bold' }}>KG</Text>
             </View>
+
+            {/* Giá bán — điền sẵn giá gợi ý của AI, người bán sửa lại được */}
+            {scan && (
+              <>
+                <Text style={[styles.label, { color: colors.textPrimary }]}>Giá bán (đ/kg)</Text>
+                <View style={[styles.inputGroup, { backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9' }]}>
+                  <Ionicons name="pricetag-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.input, { color: colors.textPrimary }]}
+                    placeholder="Ví dụ: 190000"
+                    placeholderTextColor={colors.textMuted}
+                    value={price}
+                    onChangeText={setPrice}
+                    keyboardType="numeric"
+                  />
+                  <Text style={{ color: colors.textMuted, fontWeight: 'bold' }}>đ/kg</Text>
+                </View>
+              </>
+            )}
 
             {/* Chọn Chất lượng */}
             <Text style={[styles.label, { color: colors.textPrimary }]}>Chất lượng (Đánh giá sơ bộ)</Text>
@@ -293,6 +406,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   imageOverlayText: { color: '#fff', fontSize: 14, fontWeight: 'bold', marginTop: 8 },
+  scanImage: { width: '100%', height: '100%' },
+  aiBadge: {
+    position: 'absolute',
+    left: 12,
+    bottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(5, 150, 105, 0.92)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  aiBadgeWarning: { backgroundColor: 'rgba(217, 119, 6, 0.92)' },
+  aiBadgeText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+  hintBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  hintText: { flex: 1, fontSize: 13, lineHeight: 18 },
   formContainer: {
     borderRadius: 16,
     padding: 20,

@@ -17,6 +17,7 @@ import {
 import { fetchMarketBatches } from '../api/seafood';
 import { fetchVessels } from '../api/vessels';
 import { fetchOrders } from '../api/orders';
+import { API_BASE_URL } from '../api/client';
 
 // Khớp enum quality_level (giống nhãn bên mobile/src/screens/MarketScreen.js)
 const QUALITY_LABELS = {
@@ -143,9 +144,17 @@ export default function AdminDashboard() {
     <tr key={batch.id}>
       <td>
         <div className="flex items-center gap-3">
-          <span className="w-11 h-11 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-            <Fish className="w-5 h-5" />
-          </span>
+          {batch.image_url ? (
+            <img
+              src={`${API_BASE_URL}${batch.image_url}`}
+              alt={batch.species?.name_vi}
+              className="w-11 h-11 rounded-xl object-cover border border-slate-200 shrink-0"
+            />
+          ) : (
+            <span className="w-11 h-11 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+              <Fish className="w-5 h-5" />
+            </span>
+          )}
           <div className="min-w-0">
             <h4 className="font-bold text-slate-900 text-sm">{batch.species?.name_vi}</h4>
             <div className="text-xs text-slate-500">{formatDateTime(batch.created_at)}</div>

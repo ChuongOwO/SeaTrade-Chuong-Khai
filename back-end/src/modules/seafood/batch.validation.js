@@ -42,6 +42,30 @@ const updateBatchSchema = Joi.object({
   return value;
 });
 
+// [POST] /api/seafood/batches/from-scan — multipart/form-data nên mọi field
+// đến dưới dạng chuỗi; Joi tự ép kiểu số (convert mặc định bật).
+// Các field ai_* là kết quả nhận diện của ai-service để lưu lại vào ai_detections.
+const publishFromScanSchema = Joi.object({
+  vessel_id: Joi.string().uuid().required(),
+  species_id: Joi.string().uuid().required(),
+  quantity_kg: Joi.number().positive().required().messages({
+    'any.required': 'Vui lòng nhập số lượng (kg)',
+    'number.positive': 'Số lượng (kg) phải lớn hơn 0'
+  }),
+  price_per_kg: Joi.number().min(0).required().messages({
+    'any.required': 'Vui lòng nhập giá bán (đ/kg)'
+  }),
+  quality_level: Joi.string().valid(...qualityLevels).allow(null, ''),
+  latitude: Joi.number().min(-90).max(90).allow(null, ''),
+  longitude: Joi.number().min(-180).max(180).allow(null, ''),
+  ai_model_version: Joi.string().max(100).allow(null, ''),
+  ai_confidence: Joi.number().min(0).max(1).allow(null, ''),
+  ai_x1: Joi.number().min(0).allow(null, ''),
+  ai_y1: Joi.number().min(0).allow(null, ''),
+  ai_x2: Joi.number().min(0).allow(null, ''),
+  ai_y2: Joi.number().min(0).allow(null, '')
+});
+
 const validate = (schema) => (req, res, next) => {
   const { error } = schema.validate(req.body, { abortEarly: false });
   if (error) {
@@ -57,5 +81,6 @@ const validate = (schema) => (req, res, next) => {
 module.exports = {
   createBatchSchema,
   updateBatchSchema,
+  publishFromScanSchema,
   validate
 };

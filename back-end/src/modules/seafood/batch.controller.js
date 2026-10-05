@@ -1,4 +1,6 @@
+const fs = require('fs');
 const batchService = require('./batch.service');
+const { publishFromScanSchema } = require('./batch.validation');
 
 // [POST] /api/seafood/batches
 const createBatch = async (req, res, next) => {
@@ -148,10 +150,11 @@ const deleteBatch = async (req, res, next) => {
       metadata: null
     });
   } catch (error) {
-    if (error.code === '23503') {
+    // 23001 = restrict_violation, 23503 = foreign_key_violation
+    if (['23001', '23503'].includes(error.code)) {
       return res.status(409).json({
         status: 409,
-        message: 'Không thể xóa lô hàng này vì đang có dữ liệu ràng buộc (Images/Listings)'
+        message: 'Mẻ cá đã có người trả giá hoặc đã thành đơn hàng nên không thể gỡ khỏi chợ'
       });
     }
     next(error);
@@ -171,8 +174,64 @@ const getMarketBatches = async (req, res, next) => {
   }
 };
 
+// Xoá ảnh đã upload khi request thất bại — tránh rác trong uploads/batches
+const removeUploadedFile = (file) => {
+  if (file) fs.unlink(file.path, () => {});
+};
+
+// [POST] /api/seafood/batches/from-scan — đăng bán ngay từ ảnh vừa quét AI
+// (multipart: field "image" + các field trong publishFromScanSchema)
+const publishFromScan = async (req, res, next) => {
+  const reject = (status, message, error) => {
+    removeUploadedFile(req.file);
+    return res.status(status).json({ status, message, error });
+  };
+
+  try {
+    if (!req.file) return reject(400, 'Thiếu ảnh hải sản (field "image")');
+
+    const { error, value } = publishFromScanSchema.validate(req.body, { abortEarly: false });
+    if (error) return reject(400, 'Dữ liệu không hợp lệ', error.details.map(err => err.message));
+
+    const seller_id = req.user.id;
+    if (!(await batchService.checkVesselOwnership(value.vessel_id, seller_id))) {
+      return reject(403, 'Bạn không có quyền đăng bán cho tàu này');
+    }
+    if (!(await batchService.checkSpeciesExists(value.species_id))) {
+      return reject(404, 'Loài hải sản không tồn tại');
+    }
+
+    // multipart gửi field rỗng thành '' -> coi như không có
+    const optional = (v) => (v === '' ? null : v);
+    const published = await batchService.publishBatchFromScan({
+      ...value,
+      quality_level: optional(value.quality_level),
+      latitude: optional(value.latitude),
+      longitude: optional(value.longitude),
+      ai_model_version: optional(value.ai_model_version),
+      ai_confidence: optional(value.ai_confidence),
+      ai_x1: optional(value.ai_x1),
+      ai_y1: optional(value.ai_y1),
+      ai_x2: optional(value.ai_x2),
+      ai_y2: optional(value.ai_y2),
+      seller_id,
+      image_url: `/uploads/batches/${req.file.filename}`
+    });
+
+    res.status(201).json({
+      status: 201,
+      message: 'Đã đăng mẻ hải sản lên chợ',
+      metadata: published
+    });
+  } catch (error) {
+    removeUploadedFile(req.file);
+    next(error);
+  }
+};
+
 module.exports = {
   createBatch,
+  publishFromScan,
   getBatches,
   getBatchById,
   updateBatch,
