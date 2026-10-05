@@ -16,14 +16,19 @@ class BoundingBox(BaseModel):
 class Detection(BaseModel):
     class_id: int
     class_name: str
-    # Tên hiển thị tiếng Việt, map từ class_name qua SPECIES_INFO
-    # (app/services/inference.py) — mặc định trùng class_name nếu chưa có
-    # trong bảng map.
+    # Biến thể do model phân loại tầng 2 xác định (vd ca_thu_phan) — None nếu
+    # không có model tầng 2 hoặc chưa đủ chắc chắn.
+    variant: Optional[str] = None
+    variant_confidence: Optional[float] = None
+    # Tên hiển thị tiếng Việt, map qua SPECIES_INFO (app/services/species_catalog.py)
+    # — mặc định trùng class_name nếu chưa có trong bảng map.
     label_vi: str
     # Nhóm loài khớp seafood_species.name_vi trong DB (Cá ngừ, Cá thu, Tôm...)
     # — None nếu lớp này chưa có nhóm tương ứng.
     species_group: Optional[str] = None
     confidence: float = Field(..., ge=0, le=1)
+    # Độ tin cậy dưới ngưỡng review → app nên yêu cầu người dùng xác nhận loài
+    is_uncertain: bool = False
     box: BoundingBox
     estimated_price_per_kg: Optional[int] = None
 
@@ -34,5 +39,8 @@ class ClassificationResponse(BaseModel):
     image_height: int
     count: int
     detections: List[Detection]
+    # True khi không phát hiện được gì hoặc phát hiện tốt nhất chưa đủ chắc chắn
+    needs_review: bool
     processing_time_ms: float
     model_version: str
+    classifier_version: Optional[str] = None

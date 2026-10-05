@@ -148,6 +148,13 @@ export default function AIVisionPlayground() {
                 </div>
               </div>
 
+              {result.needs_review && (
+                <div className="info-box text-amber-800 bg-amber-50 border border-amber-200 text-xs flex items-start gap-2" role="status">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>AI chưa đủ chắc chắn về kết quả này. Người dùng cần xác nhận lại hoặc chọn loài thủ công khi đăng bán.</span>
+                </div>
+              )}
+
               {detections.length === 0 ? (
                 <p className="text-sm text-slate-500">Mô hình không nhận diện được hải sản nào trong ảnh này.</p>
               ) : (
@@ -160,8 +167,14 @@ export default function AIVisionPlayground() {
                           <h4 className="text-sm font-bold text-slate-900 truncate">{det.label_vi}</h4>
                           {det.species_group && <span className="text-xs text-slate-500 block">Nhóm: {det.species_group}</span>}
                           <span className="text-xs text-slate-500 flex items-center gap-1">
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> {formatPercent(det.confidence)}
+                            {det.is_uncertain
+                              ? <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                              : <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />}
+                            {formatPercent(det.confidence)}{det.is_uncertain && ' • chưa chắc chắn'}
                           </span>
+                          {det.variant_confidence != null && (
+                            <span className="text-xs text-slate-500 block">Biến thể: {formatPercent(det.variant_confidence)}</span>
+                          )}
                         </div>
                       </div>
                       {det.estimated_price_per_kg != null && (
@@ -175,7 +188,8 @@ export default function AIVisionPlayground() {
               )}
 
               <p className="text-xs text-slate-500">
-                Model: <span className="font-mono">{result.model_version}</span> • Kích thước ảnh {result.image_width}×{result.image_height}px.
+                Model: <span className="font-mono">{result.model_version}</span>
+                {result.classifier_version && <> + <span className="font-mono">{result.classifier_version}</span></>} • Kích thước ảnh {result.image_width}×{result.image_height}px.
                 Giá gợi ý là giá tham khảo, cần đối chiếu giá thị trường thực tế.
               </p>
             </>

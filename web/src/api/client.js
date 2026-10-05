@@ -7,7 +7,7 @@
 //
 // Base URL đọc từ biến môi trường VITE_API_BASE_URL (Vite), mặc định trỏ về
 // http://localhost:5000 — khớp với PORT mặc định trong back-end/src/config/env.js.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 const TOKEN_STORAGE_KEY = 'seatrade_auth_token';
 

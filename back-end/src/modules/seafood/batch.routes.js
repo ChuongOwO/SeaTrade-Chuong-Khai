@@ -3,6 +3,17 @@ const router = express.Router();
 const batchController = require('./batch.controller');
 const { createBatchSchema, updateBatchSchema, validate } = require('./batch.validation');
 const authMiddleware = require('../../middleware/auth.middleware');
+const { createImageUpload } = require('../../middleware/upload.middleware');
+
+const batchImageUpload = createImageUpload('batches', 'batch', 10).single('image');
+
+// Lỗi của multer (ảnh quá 10MB, sai định dạng) trả 400 thay vì 500
+const uploadBatchImage = (req, res, next) => {
+  batchImageUpload(req, res, (err) => {
+    if (err) return res.status(400).json({ status: 400, message: err.message });
+    next();
+  });
+};
 
 // Áp dụng middleware auth cho TOÀN BỘ các route
 router.use(authMiddleware);
@@ -107,6 +118,43 @@ router.post('/', validate(createBatchSchema), batchController.createBatch);
  *       200:
  *         description: Trả về danh sách lô hàng
  */
+/**
+ * @swagger
+ * /api/seafood/batches/from-scan:
+ *   post:
+ *     summary: Đăng bán mẻ hải sản ngay từ ảnh quét AI
+ *     description: Tạo mẻ cá AVAILABLE + lưu ảnh + kết quả AI + tin đăng bán có giá, trong 1 transaction.
+ *     tags: [Seafood Batches]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [image, vessel_id, species_id, quantity_kg, price_per_kg]
+ *             properties:
+ *               image: { type: string, format: binary }
+ *               vessel_id: { type: string, format: uuid }
+ *               species_id: { type: string, format: uuid }
+ *               quantity_kg: { type: number }
+ *               price_per_kg: { type: number }
+ *               quality_level: { type: string, enum: [PREMIUM, GOOD, NORMAL, LOW] }
+ *               latitude: { type: number }
+ *               longitude: { type: number }
+ *               ai_model_version: { type: string }
+ *               ai_confidence: { type: number }
+ *               ai_x1: { type: number }
+ *               ai_y1: { type: number }
+ *               ai_x2: { type: number }
+ *               ai_y2: { type: number }
+ *     responses:
+ *       201:
+ *         description: Đã đăng lên chợ
+ */
+router.post('/from-scan', uploadBatchImage, batchController.publishFromScan);
+
 router.get('/', batchController.getBatches);
 
 /**

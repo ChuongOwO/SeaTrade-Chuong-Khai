@@ -44,6 +44,8 @@ async def classify_seafood(file: UploadFile = File(...)):
         "image_height": result["height"],
         "count": len(result["detections"]),
         "detections": result["detections"],
+        "needs_review": result["needs_review"],
         "processing_time_ms": result["processing_time_ms"],
         "model_version": result["model_version"],
+        "classifier_version": result["classifier_version"],
     }

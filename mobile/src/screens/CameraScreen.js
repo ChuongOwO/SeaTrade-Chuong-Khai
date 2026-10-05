@@ -77,14 +77,28 @@ export default function CameraScreen({ navigation }) {
         ? `${top.estimated_price_per_kg.toLocaleString('vi-VN')} đ/kg`
         : 'Chưa có dữ liệu giá';
 
+      // needs_review: AI chưa đủ chắc chắn (xem ai-service REVIEW_CONFIDENCE_THRESHOLD)
+      // -> nhắc thuyền trưởng tự kiểm tra lại loài trước khi đăng bán.
+      const reviewNote = aiResult.needs_review
+        ? '\n\n⚠️ AI chưa chắc chắn về kết quả này — hãy kiểm tra và chọn lại loài cho đúng khi đăng bán.'
+        : '';
+
       Alert.alert(
-        'YOLOv8 AI Đã Phân Tích',
-        `Loài: ${top.label_vi}\nSố lượng phát hiện: ${aiResult.count}\nĐộ tin cậy: ${confidencePct}%\nGiá gợi ý: ${priceText}\nThời gian xử lý: ${aiResult.processing_time_ms}ms`,
+        aiResult.needs_review ? 'Cần Xác Nhận Lại Loài' : 'YOLOv8 AI Đã Phân Tích',
+        `Loài: ${top.label_vi}\nSố lượng phát hiện: ${aiResult.count}\nĐộ tin cậy: ${confidencePct}%\nGiá gợi ý: ${priceText}\nThời gian xử lý: ${aiResult.processing_time_ms}ms${reviewNote}`,
         [
           {
             text: 'Đăng Bán Ngay', onPress: () => {
               setLastPhotoUri(null);
-              navigation.navigate('CreateBatch');
+              // Chuyển kết quả AI sang màn Đăng bán để điền sẵn loài, ảnh, giá
+              navigation.navigate('CreateBatch', {
+                scan: {
+                  photoUri: uri,
+                  detection: top,
+                  modelVersion: aiResult.model_version,
+                  needsReview: aiResult.needs_review,
+                },
+              });
             }
           },
           { text: 'Chụp Lại', onPress: () => setLastPhotoUri(null), style: 'cancel' },

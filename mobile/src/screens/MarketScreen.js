@@ -141,7 +141,14 @@ export default function MarketScreen({ navigation }) {
     const vesselName = item.vessel?.vessel_name || 'Không rõ tàu';
     const vesselCode = item.vessel?.vessel_code || '';
     const qualityLabel = QUALITY_LABELS[item.quality_level] || item.quality_level;
-    const imageUri = item.species?.image_url || FALLBACK_IMAGE;
+    // Ưu tiên ảnh thật của mẻ cá (đăng từ ảnh quét AI, đường dẫn tương đối
+    // /uploads/... trên back-end), rồi tới ảnh mẫu của loài
+    const imageUri = item.image_url
+      ? `${API_URL}${item.image_url}`
+      : item.species?.image_url || FALLBACK_IMAGE;
+    const priceText = Number(item.price_per_kg) > 0
+      ? `${Number(item.price_per_kg).toLocaleString('vi-VN')} đ/kg`
+      : null;
     const isMyBatch = item.owner_id === userId;
 
     return (
@@ -155,6 +162,7 @@ export default function MarketScreen({ navigation }) {
           <Text style={styles.vessel}>🚢 {vesselName} ({vesselCode})</Text>
           <Text style={styles.grade}>{qualityLabel}</Text>
           <Text style={styles.quantity}>📦 {item.quantity_kg} kg</Text>
+          {priceText && <Text style={styles.price}>💰 {priceText}</Text>}
 
           {isMyBatch ? (
             <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteBatch(item)}>
@@ -311,6 +319,12 @@ const styles = StyleSheet.create({
   quantity: {
     fontSize: 14,
     color: colors.warningAccent,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  price: {
+    fontSize: 14,
+    color: colors.primary,
     fontWeight: 'bold',
     marginTop: 2,
   },
