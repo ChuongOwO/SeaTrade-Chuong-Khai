@@ -1,10 +1,26 @@
 const vesselService = require('./vessel.service');
 
+// ADMIN được thao tác trên mọi tàu (null = không lọc theo chủ tàu),
+// các vai trò khác chỉ thao tác trên tàu của chính mình.
+const getOwnerScope = (user) => (user.role === 'ADMIN' ? null : user.id);
+
+// ADMIN có thể đăng ký tàu hộ người khác qua owner_phone; mặc định chủ tàu là người gọi.
+const resolveOwnerId = async (user, owner_phone) => {
+  if (user.role !== 'ADMIN' || !owner_phone) return user.id;
+  return vesselService.findUserIdByPhone(owner_phone);
+};
+
 // [POST] /api/vessels
 const createVessel = async (req, res, next) => {
   try {
-    const owner_id = req.user.id;
-    const vesselData = req.body;
+    const { owner_phone, ...vesselData } = req.body;
+    const owner_id = await resolveOwnerId(req.user, owner_phone);
+    if (!owner_id) {
+      return res.status(404).json({
+        status: 404,
+        message: 'Không tìm thấy tài khoản chủ tàu với số điện thoại này'
+      });
+    }
 
     // Kiểm tra trùng lặp mã tàu
     const exists = await vesselService.checkVesselCodeExists(vesselData.vessel_code);
@@ -30,8 +46,9 @@ const createVessel = async (req, res, next) => {
 // [GET] /api/vessels
 const getMyVessels = async (req, res, next) => {
   try {
-    const owner_id = req.user.id;
-    const vessels = await vesselService.getVesselsByOwner(owner_id);
+    const vessels = req.user.role === 'ADMIN'
+      ? await vesselService.getAllVessels()
+      : await vesselService.getVesselsByOwner(req.user.id);
 
     res.json({
       status: 200,
@@ -47,7 +64,7 @@ const getMyVessels = async (req, res, next) => {
 const getVesselById = async (req, res, next) => {
   try {
     const vessel_id = req.params.id;
-    const owner_id = req.user.id;
+    const owner_id = getOwnerScope(req.user);
 
     const vessel = await vesselService.getVesselByIdAndOwner(vessel_id, owner_id);
     
@@ -72,7 +89,7 @@ const getVesselById = async (req, res, next) => {
 const updateVessel = async (req, res, next) => {
   try {
     const vessel_id = req.params.id;
-    const owner_id = req.user.id;
+    const owner_id = getOwnerScope(req.user);
     const updateData = req.body;
 
     const updatedVessel = await vesselService.updateVessel(vessel_id, owner_id, updateData);
@@ -98,7 +115,7 @@ const updateVessel = async (req, res, next) => {
 const deleteVessel = async (req, res, next) => {
   try {
     const vessel_id = req.params.id;
-    const owner_id = req.user.id;
+    const owner_id = getOwnerScope(req.user);
 
     const deleted = await vesselService.deleteVessel(vessel_id, owner_id);
 
@@ -115,6 +132,14 @@ const deleteVessel = async (req, res, next) => {
       metadata: null
     });
   } catch (error) {
+    // Tàu đã có lô hàng / chuyến giao: 23001 = restrict_violation (ON DELETE RESTRICT),
+    // 23503 = foreign_key_violation
+    if (['23001', '23503'].includes(error.code)) {
+      return res.status(409).json({
+        status: 409,
+        message: 'Tàu đã phát sinh lô hàng hoặc giao dịch nên không thể xóa. Hãy chuyển trạng thái sang Ngừng hoạt động.'
+      });
+    }
     next(error);
   }
 };

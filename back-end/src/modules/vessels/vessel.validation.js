@@ -9,18 +9,22 @@ const createVesselSchema = Joi.object({
     'string.empty': 'Tên tàu không được để trống',
     'any.required': 'Tên tàu là bắt buộc'
   }),
-  vessel_type: Joi.string().valid('FISHING', 'COLLECTION', 'TRANSPORT').default('FISHING'),
+  vessel_type: Joi.string().valid('FISHING', 'COLLECTOR', 'TRANSPORT').default('FISHING'),
   capacity_kg: Joi.number().min(0).default(0),
   registration_number: Joi.string().max(50).allow('', null),
-  status: Joi.string().valid('ACTIVE', 'INACTIVE', 'MAINTENANCE').default('ACTIVE')
+  phone: Joi.string().max(20).allow('', null),
+  status: Joi.string().valid('ACTIVE', 'INACTIVE', 'OFFLINE', 'MAINTENANCE').default('ACTIVE'),
+  // Chỉ ADMIN dùng: đăng ký tàu hộ chủ tàu khác (tra user theo SĐT)
+  owner_phone: Joi.string().max(20)
 });
 
 const updateVesselSchema = Joi.object({
   vessel_name: Joi.string().max(100),
-  vessel_type: Joi.string().valid('FISHING', 'COLLECTION', 'TRANSPORT'),
+  vessel_type: Joi.string().valid('FISHING', 'COLLECTOR', 'TRANSPORT'),
   capacity_kg: Joi.number().min(0),
   registration_number: Joi.string().max(50).allow('', null),
-  status: Joi.string().valid('ACTIVE', 'INACTIVE', 'MAINTENANCE')
+  phone: Joi.string().max(20).allow('', null),
+  status: Joi.string().valid('ACTIVE', 'INACTIVE', 'OFFLINE', 'MAINTENANCE')
 });
 
 // Ghi nhận 1 vị trí GPS mới cho tàu — dùng khi Mobile App gửi định kỳ vị trí
