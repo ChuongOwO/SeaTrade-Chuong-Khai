@@ -8,6 +8,7 @@ import MobileAppSimulator from './components/MobileAppSimulator';
 import AIVisionPlayground from './components/AIVisionPlayground';
 import MaritimeMap from './components/MaritimeMap';
 import AnalyticsView from './components/AnalyticsView';
+import UserManagement from './components/UserManagement';
 import UserManual from './components/UserManual';
 
 import { INITIAL_POSTS, INITIAL_VESSELS, INITIAL_ORDERS } from './data/mockData';
@@ -23,7 +24,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('admin');
   const [activeRole, setActiveRole] = useState('FISHERMAN'); // vai trò trong Mobile App Simulator
   const [posts, setPosts] = useState(INITIAL_POSTS);
-  const [vessels, setVessels] = useState(INITIAL_VESSELS);
+  const [vessels] = useState(INITIAL_VESSELS);
   const [orders, setOrders] = useState(INITIAL_ORDERS);
   const [offlineMode, setOfflineMode] = useState(false);
 
@@ -123,26 +124,15 @@ export default function App() {
         )}
 
         {canViewActiveTab && activeTab === 'admin' && (
-          <AdminDashboard
-            posts={posts}
-            setPosts={setPosts}
-            vessels={vessels}
-            orders={orders}
-          />
+          <AdminDashboard />
         )}
 
         {canViewActiveTab && activeTab === 'orders' && (
-          <OrderManagement
-            orders={orders}
-            setOrders={setOrders}
-          />
+          <OrderManagement />
         )}
 
         {canViewActiveTab && activeTab === 'fleet' && (
-          <FleetManagement
-            vessels={vessels}
-            setVessels={setVessels}
-          />
+          <FleetManagement />
         )}
 
         {canViewActiveTab && activeTab === 'mobile' && (
@@ -171,12 +161,12 @@ export default function App() {
           />
         )}
 
+        {canViewActiveTab && activeTab === 'users' && (
+          <UserManagement currentUser={currentUser} />
+        )}
+
         {canViewActiveTab && activeTab === 'analytics' && (
-          <AnalyticsView
-            posts={posts}
-            orders={orders}
-            vessels={vessels}
-          />
+          <AnalyticsView />
         )}
 
         {canViewActiveTab && activeTab === 'user-manual' && (

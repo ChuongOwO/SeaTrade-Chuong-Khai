@@ -18,6 +18,7 @@ const chatRoutes = require('./modules/chat/chat.routes');
 const notificationsRoutes = require('./modules/notifications/notifications.routes');
 const offerRoutes = require('./modules/offers/offer.routes');
 const orderRoutes = require('./modules/orders/order.routes');
+const adminRoutes = require('./modules/admin/admin.routes');
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/offers', offerRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Global Error Handler
 app.use(errorMiddleware);
