@@ -40,7 +40,7 @@ router.use(authMiddleware);
  *                 example: 'Tàu Cá Sài Gòn'
  *               vessel_type:
  *                 type: string
- *                 enum: [FISHING, COLLECTION, TRANSPORT]
+ *                 enum: [FISHING, COLLECTOR, TRANSPORT]
  *                 example: 'FISHING'
  *               capacity_kg:
  *                 type: number
@@ -219,7 +219,7 @@ router.get('/:id', vesselController.getVesselById);
  *                 example: 'Tàu Cá Sài Gòn Mới'
  *               vessel_type:
  *                 type: string
- *                 enum: [FISHING, COLLECTION, TRANSPORT]
+ *                 enum: [FISHING, COLLECTOR, TRANSPORT]
  *               capacity_kg:
  *                 type: number
  *                 example: 6000

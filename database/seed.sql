@@ -15,8 +15,8 @@ INSERT INTO species (id, name, scientific_name, category, unit, base_price_min, 
         'https://images.unsplash.com/photo-1534483509719-3feaee7c30da?auto=format&fit=crop&w=600&q=80', NULL),
     ('a0000000-0000-0000-0000-000000000003', 'Tôm Hùm Bông / Tôm Hùm Đá', 'Panulirus ornatus', 'Shrimp', 'kg', 950000, 1400000,
         'Tôm hùm bông thiên nhiên đánh bắt rạn bãi ven đảo, vỏ rực rỡ, thịt săn dai đặc sản.',
-        'https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?auto=format&fit=crop&w=600&q=80', 'Shrimp'),
-        -- ai_label = 'Shrimp' vì đây là loài DUY NHẤT model AI hiện tại (shrimp_model.pt) nhận diện được
+        'https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?auto=format&fit=crop&w=600&q=80', 'tom_hum_bong'),
+        -- ai_label = tên lớp tương ứng trong model AI seafood_model.pt
     ('a0000000-0000-0000-0000-000000000004', 'Mực Lá Đại Dương', 'Sepioteuthis lessoniana', 'Squid', 'kg', 220000, 310000,
         'Mực lá thân dày, da đổi màu chớp nháy khi vừa kéo lưới, giòn ngọt hảo hạng.',
         'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?auto=format&fit=crop&w=600&q=80', NULL),
@@ -63,8 +63,8 @@ INSERT INTO catch_images (id, batch_id, image_url, uploaded_by, captured_at) VAL
 
 INSERT INTO ai_detections (image_id, model_version, species_id, raw_label, confidence,
                             bbox_x, bbox_y, bbox_width, bbox_height, estimated_size_cm, quality_score, freshness_score) VALUES
-    ('f0000000-0000-0000-0000-000000000001', 'shrimp_model_v1.2', 'a0000000-0000-0000-0000-000000000003',
-        'Shrimp', 0.9421, 120.5, 80.0, 210.0, 160.0, 24.5, 88.0, 92.5);
+    ('f0000000-0000-0000-0000-000000000001', 'seafood_model.pt', 'a0000000-0000-0000-0000-000000000003',
+        'tom_hum_bong', 0.9421, 120.5, 80.0, 210.0, 160.0, 24.5, 88.0, 92.5);
 
 -- ---------- Tin đăng + đàm phán ----------
 INSERT INTO listings (id, batch_id, vessel_id, species_id, grade_id, title, description, price_per_kg,

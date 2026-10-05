@@ -73,7 +73,7 @@ Tài liệu được tạo tự động từ trang Hướng Dẫn của ứng d�
   return (
     <div className="page-section max-w-none w-full">
       
-      <div className="page-header flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div className="page-header page-header-row">
         <div>
           <h2 className="page-header-title">Hướng Dẫn Sử Dụng & Vận Hành Hệ Thống</h2>
           <p className="page-header-desc">

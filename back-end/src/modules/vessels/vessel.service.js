@@ -1,13 +1,17 @@
 const pool = require('../../config/database');
 
+const NULLABLE_FIELDS = ['capacity_kg', 'registration_number', 'phone'];
+
 const createVessel = async (owner_id, vesselData) => {
-  const { vessel_code, vessel_name, vessel_type, capacity_kg, registration_number, status } = vesselData;
+  const { vessel_code, vessel_name, vessel_type, capacity_kg, registration_number, phone, status } = vesselData;
   const insertQuery = `
-    INSERT INTO vessels (owner_id, vessel_code, vessel_name, vessel_type, capacity_kg, registration_number, status)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO vessels (owner_id, vessel_code, vessel_name, vessel_type, capacity_kg, registration_number, phone, status)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *
   `;
-  const values = [owner_id, vessel_code, vessel_name, vessel_type || 'FISHING', capacity_kg || 0, registration_number, status || 'ACTIVE'];
+  // capacity_kg: DB có CHECK (capacity_kg IS NULL OR capacity_kg > 0) nên 0 phải lưu thành NULL;
+  // registration_number UNIQUE nên chuỗi rỗng cũng lưu NULL để không đụng nhau.
+  const values = [owner_id, vessel_code, vessel_name, vessel_type || 'FISHING', capacity_kg || null, registration_number || null, phone || null, status || 'ACTIVE'];
   const result = await pool.query(insertQuery, values);
   return result.rows[0];
 };
@@ -18,10 +22,48 @@ const getVesselsByOwner = async (owner_id) => {
   return result.rows;
 };
 
+/**
+ * Toàn bộ tàu trong hệ thống kèm thông tin chủ tàu + vị trí GPS mới nhất —
+ * dùng cho trang Quản Lý Đội Tàu của ADMIN trên web.
+ */
+const getAllVessels = async () => {
+  const query = `
+    SELECT
+      v.*,
+      u.full_name AS owner_name,
+      u.phone     AS owner_phone,
+      ST_X(vl.location::geometry) AS longitude,
+      ST_Y(vl.location::geometry) AS latitude,
+      vl.speed,
+      vl.heading,
+      vl.recorded_at
+    FROM vessels v
+    JOIN users u ON u.id = v.owner_id
+    LEFT JOIN (
+      SELECT DISTINCT ON (vessel_id) vessel_id, location, speed, heading, recorded_at
+      FROM vessel_locations
+      ORDER BY vessel_id, recorded_at DESC
+    ) vl ON vl.vessel_id = v.id
+    ORDER BY v.created_at DESC
+  `;
+  const result = await pool.query(query);
+  return result.rows;
+};
+
+// owner_id = null nghĩa là không giới hạn chủ tàu (ADMIN thao tác trên mọi tàu).
 const getVesselByIdAndOwner = async (vessel_id, owner_id) => {
+  if (owner_id === null) {
+    const result = await pool.query('SELECT * FROM vessels WHERE id = $1', [vessel_id]);
+    return result.rows[0];
+  }
   const query = 'SELECT * FROM vessels WHERE id = $1 AND owner_id = $2';
   const result = await pool.query(query, [vessel_id, owner_id]);
   return result.rows[0];
+};
+
+const findUserIdByPhone = async (phone) => {
+  const result = await pool.query('SELECT id FROM users WHERE phone = $1', [phone]);
+  return result.rows[0]?.id || null;
 };
 
 const updateVessel = async (vessel_id, owner_id, updateData) => {
@@ -36,7 +78,8 @@ const updateVessel = async (vessel_id, owner_id, updateData) => {
 
   for (const [key, value] of Object.entries(updateData)) {
     updateQuery += `${key} = $${index}, `;
-    values.push(value);
+    // Giống createVessel: 0 / chuỗi rỗng lưu thành NULL để không vi phạm CHECK/UNIQUE
+    values.push(NULLABLE_FIELDS.includes(key) && !value ? null : value);
     index++;
   }
 
@@ -270,7 +313,9 @@ const bearingToText = (bearing) => {
 module.exports = {
   createVessel,
   getVesselsByOwner,
+  getAllVessels,
   getVesselByIdAndOwner,
+  findUserIdByPhone,
   updateVessel,
   deleteVessel,
   checkVesselCodeExists,

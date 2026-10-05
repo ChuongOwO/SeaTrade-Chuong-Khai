@@ -4,12 +4,10 @@ from pathlib import Path
 # ai-service/  (thư mục gốc của service, cha 2 cấp của file này)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Đường dẫn tới model YOLOv8 đã train cho ĐÚNG đề tài hải sản thật (8 lớp:
-# tôm hùm/cá thu/cá ngừ, xem HUONG_DAN_TRAIN_MODEL_HAI_SAN.md). Model tôm
-# giống cũ (shrimp_model.pt, đề tài đã hủy) đã chuyển vào
-# ml-models/_old_demo_model_khong_dung/ — không còn được dùng mặc định.
-# Có thể override bằng biến môi trường AI_MODEL_PATH để thử model khác
-# (VD: yolov8n.pt gốc) mà không cần sửa code.
+# Đường dẫn tới model YOLOv8 nhận dạng loài hải sản (12 lớp: cá ngừ, cá thu,
+# tôm hùm, cá bạc má, cá chim — xem SPECIES_INFO trong
+# app/services/inference.py). Có thể override bằng biến môi trường
+# AI_MODEL_PATH để thử model khác mà không cần sửa code.
 MODEL_PATH = os.getenv("AI_MODEL_PATH", str(BASE_DIR / "ml-models" / "seafood_model.pt"))
 
 # Ngưỡng độ tin cậy tối thiểu để 1 phát hiện được coi là hợp lệ — loại bỏ bớt

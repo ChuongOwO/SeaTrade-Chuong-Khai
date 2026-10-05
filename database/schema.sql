@@ -107,8 +107,8 @@ CREATE TABLE species (
     base_price_max    NUMERIC(12,2),
     description       TEXT,
     sample_image_url  TEXT,
-    -- Cầu nối tới model AI: nhãn thô model trả về (vd model hiện tại chỉ nhận
-    -- diện được 'Shrimp'). NULL nghĩa là loài này AI chưa nhận diện được.
+    -- Cầu nối tới model AI: nhãn thô model trả về (vd 'tom_hum_bong').
+    -- NULL nghĩa là loài này AI chưa nhận diện được.
     ai_label          VARCHAR(50),
     is_active         BOOLEAN NOT NULL DEFAULT TRUE,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now()

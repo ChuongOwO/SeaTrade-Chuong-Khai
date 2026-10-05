@@ -206,6 +206,10 @@ const getMarketBatches = async () => {
   const query = `
     SELECT 
       b.id, b.quantity_kg, b.quality_level, b.status, b.created_at,
+      b.catch_time, b.freshness_score,
+      ST_Y(b.catch_location::geometry) AS catch_lat,
+      ST_X(b.catch_location::geometry) AS catch_lng,
+      l.price_per_kg,
       v.owner_id, u.phone AS owner_phone, u.full_name AS owner_name,
       json_build_object('id', v.id, 'vessel_name', v.vessel_name, 'vessel_code', v.vessel_code) AS vessel,
       json_build_object('id', s.id, 'name_vi', s.name_vi, 'name_en', s.name_en, 'image_url', s.image_url) AS species
@@ -213,6 +217,11 @@ const getMarketBatches = async () => {
     JOIN vessels v ON b.vessel_id = v.id
     JOIN seafood_species s ON b.species_id = s.id
     JOIN users u ON v.owner_id = u.id
+    -- Giá chào bán (nếu mẻ cá đã có listing, xem listings/listing.service.js)
+    LEFT JOIN LATERAL (
+      SELECT price_per_kg FROM seafood_listings
+      WHERE batch_id = b.id ORDER BY created_at DESC LIMIT 1
+    ) l ON TRUE
     WHERE b.status = 'AVAILABLE'
     ORDER BY b.created_at DESC
   `;

@@ -31,6 +31,10 @@ yarn-error.*
 *.pem
 *.tsbuildinfo
 
+# File bytecode Python tự sinh khi chạy ai-service
+__pycache__/
+*.pyc
+
 # Lockfile của package manager khác pnpm — project này chuẩn hóa dùng pnpm
 # (đã có sẵn pnpm-lock.yaml). Tránh commit lockfile song song gây lệch
 # phiên bản dependency giữa các máy trong nhóm.

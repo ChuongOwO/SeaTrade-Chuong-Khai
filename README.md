@@ -130,7 +130,7 @@ python -m pip install -r requirements.txt
 # 2. (Khuyến nghị) Kiểm tra tên các lớp (class) thật của model đang có, để
 #    đối chiếu với bảng SPECIES_INFO trong app/services/inference.py — sửa
 #    lại dict đó nếu tên lớp in ra không khớp
-python -c "from ultralytics import YOLO; print(YOLO('ml-models/shrimp_model.pt').names)"
+python -c "from ultralytics import YOLO; print(YOLO('ml-models/seafood_model.pt').names)"
 
 # 3. Chạy server — dùng python -m để chắc chắn chạy đúng bản Python vừa cài
 #    thư viện ở bước 1 (tránh lỗi ModuleNotFoundError do máy có nhiều bản
