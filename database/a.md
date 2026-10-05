@@ -130,11 +130,10 @@ AIVisionPlayground), và cho phép đối chiếu/kiểm tra lại khi model d�
 sai.
 
 **`species.ai_label` dùng để làm gì?**
-Là cầu nối giữa nhãn thô model AI trả về (chuỗi text, ví dụ `"Shrimp"`) và
-bản ghi loài trong danh mục `species` của hệ thống. Hiện tại model AI
-(`shrimp_model.pt`) chỉ nhận diện được đúng 1 loại là tôm, nên chỉ có bản
-ghi tôm hùm có `ai_label = 'Shrimp'`, các loài khác `ai_label = NULL` —
-nghĩa là chưa nhận diện tự động được, phải nhập tay. Khi có thêm model
+Là cầu nối giữa nhãn thô model AI trả về (chuỗi text, ví dụ `"tom_hum_bong"`)
+và bản ghi loài trong danh mục `species` của hệ thống. Loài nào model AI
+(`seafood_model.pt`) chưa nhận diện được thì `ai_label = NULL` — phải nhập
+tay. Khi có thêm model
 nhận diện loài mới, chỉ cần cập nhật cột này, không cần sửa cấu trúc bảng.
 
 ## 4. Toàn vẹn dữ liệu
