@@ -76,6 +76,13 @@ const postMessage = async (req, res, next) => {
     }
 
     const created = await chatService.createMessage(id, req.user.id, message);
+    
+    // Gửi sự kiện realtime qua Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      io.emit(`new_message_${id}`, created); // Emit vào channel của conversation
+    }
+
     res.status(201).json({
       status: 201,
       message: 'Gửi tin nhắn thành công',

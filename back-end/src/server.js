@@ -1,4 +1,6 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const path = require('path');
 const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
@@ -14,12 +16,15 @@ const imageRoutes = require('./modules/seafood/image.routes');
 const aiRoutes = require('./modules/ai/ai.routes');
 const chatRoutes = require('./modules/chat/chat.routes');
 const notificationsRoutes = require('./modules/notifications/notifications.routes');
+const offerRoutes = require('./modules/offers/offer.routes');
+const orderRoutes = require('./modules/orders/order.routes');
 
 const app = express();
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Swagger API Documentation
@@ -55,12 +60,52 @@ app.use('/api/seafood/images', imageRoutes);
 app.use('/api/ai/detections', aiRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/offers', offerRoutes);
+app.use('/api/orders', orderRoutes);
 
 // Global Error Handler
 app.use(errorMiddleware);
 
+// Initialize Socket.io
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: '*' }
+});
+
+// Pass io object to routes/controllers if needed via app locals
+app.set('io', io);
+
+const onlineUsers = new Map();
+
+io.on('connection', (socket) => {
+  // Client kết nối, gửi userId lên
+  socket.on('register', (userId) => {
+    if (userId) {
+      onlineUsers.set(userId, socket.id);
+      socket.userId = userId;
+      // Gửi trạng thái online cho mọi người biết
+      io.emit('user_online', userId);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    if (socket.userId) {
+      onlineUsers.delete(socket.userId);
+      // Gửi trạng thái offline
+      io.emit('user_offline', socket.userId);
+    }
+  });
+});
+
+// API hỗ trợ lấy trạng thái online của một user
+app.get('/api/users/:id/online', (req, res) => {
+  const isOnline = onlineUsers.has(req.params.id);
+  res.json({ isOnline });
+});
+
 // Start Server
-app.listen(env.port, () => {
+server.listen(env.port, () => {
   console.log(`🚀 Seafood Trading Backend is running on http://localhost:${env.port}`);
   console.log(`👉 Health check: http://localhost:${env.port}/api/health`);
+  console.log(`🔌 Socket.io is ready`);
 });

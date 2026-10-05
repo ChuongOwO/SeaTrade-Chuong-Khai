@@ -6,10 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius } from '../theme';
 import { classifySeafoodImage } from '../api/aiApi';
 
-// Phải khớp với MAX_UPLOAD_BYTES trong ai-service/app/core/config.py (10MB).
-// Kiểm tra TRƯỚC khi upload để báo lỗi ngay lập tức, tránh tốn băng thông/
-// thời gian chờ gửi cả file nặng lên rồi mới bị server trả về lỗi 413 —
-// đặc biệt quan trọng khi tàu dùng mạng di động/vệ tinh yếu ngoài khơi.
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 // LƯU Ý: màn hình này TRƯỚC ĐÂY dùng CameraView (expo-camera) để tự vẽ khung
@@ -37,7 +33,7 @@ const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 // trực tiếp — đã có ví dụ thực tế lúc test. Dùng ảnh càng giống ảnh chụp thật
 // (không qua chỉnh sửa/không có watermark, giao diện app đè lên) thì kết quả
 // càng đáng tin cậy.
-export default function CameraScreen() {
+export default function CameraScreen({ navigation }) {
   const [scanning, setScanning] = useState(false);
   const [lastPhotoUri, setLastPhotoUri] = useState(null);
 
@@ -85,8 +81,13 @@ export default function CameraScreen() {
         'YOLOv8 AI Đã Phân Tích',
         `Loài: ${top.label_vi}\nSố lượng phát hiện: ${aiResult.count}\nĐộ tin cậy: ${confidencePct}%\nGiá gợi ý: ${priceText}\nThời gian xử lý: ${aiResult.processing_time_ms}ms`,
         [
-          { text: 'Đăng Bán Ngay' },
-          { text: 'Chụp Lại' },
+          {
+            text: 'Đăng Bán Ngay', onPress: () => {
+              setLastPhotoUri(null);
+              navigation.navigate('CreateBatch');
+            }
+          },
+          { text: 'Chụp Lại', onPress: () => setLastPhotoUri(null), style: 'cancel' },
         ]
       );
     } catch (err) {

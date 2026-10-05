@@ -16,9 +16,9 @@ const startConversationSchema = Joi.object({
 // [POST] /api/chat/conversations/:id/messages
 // Tên field khớp đúng cột `message` trong bảng messages thật (không phải "content").
 const sendMessageSchema = Joi.object({
-  message: Joi.string().trim().min(1).max(2000).required().messages({
+  message: Joi.string().trim().min(1).max(2000000).required().messages({
     'string.empty': 'Nội dung tin nhắn không được để trống',
-    'string.max': 'Tin nhắn tối đa 2000 ký tự',
+    'string.max': 'Tin nhắn quá lớn (tối đa ~2MB)',
     'any.required': 'Vui lòng nhập nội dung tin nhắn'
   })
 });

@@ -7,22 +7,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { API_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchMyVessel, postVesselLocation } from '../api/vesselsApi';
 
 const SEA_CENTER = { latitude: 10.3240, longitude: 107.1240 };
-// Khoảng cách tối thiểu giữa 2 lần gửi vị trí GPS thật lên server (ms) — tránh
-// spam API vì watchPositionAsync có thể bắn sự kiện mỗi ~1 giây.
-const LOCATION_SEND_INTERVAL_MS = 15000;
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ route, navigation }) {
   const { colors, isDarkMode } = useTheme();
   const mapRef = useRef(null);
-  // vessel_id của tàu user hiện tại (lấy 1 lần từ GET /api/vessels/my-vessel) —
-  // dùng để biết gửi POST /api/vessels/:id/locations cho tàu nào.
-  const myVesselIdRef = useRef(null);
-  const lastSentAtRef = useRef(0);
 
   const [location, setLocation] = useState(null);
+  const [polyline, setPolyline] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
   const [locationSubscription, setLocationSubscription] = useState(null);
   const [demoOffset, setDemoOffset] = useState(null);
@@ -72,9 +65,6 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  // Nhắc Thuyền Trưởng đăng ký tàu nếu tài khoản FISHERMAN chưa có tàu nào
-  // trong hệ thống (tránh trường hợp đăng nhập xong không thấy mình trên bản
-  // đồ vì chưa có vessel_id nào gắn với tài khoản).
   const checkFishermanVessel = async () => {
     try {
       const userDataStr = await AsyncStorage.getItem('userData');
@@ -111,20 +101,24 @@ export default function HomeScreen({ navigation }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Lấy vessel_id của tàu mình (nếu đã đăng ký tàu) 1 lần khi vào màn hình —
-  // dùng để gửi vị trí GPS thật lên server (xem handleGetLocation bên dưới).
   useEffect(() => {
-    (async () => {
-      try {
-        const vessel = await fetchMyVessel();
-        if (vessel && vessel.vessel_id) {
-          myVesselIdRef.current = vessel.vessel_id;
-        }
-      } catch (e) {
-        console.log('Không lấy được thông tin tàu của tôi:', e.message);
+    if (route.params?.targetLocation && location) {
+      setPolyline([
+        { latitude: location.latitude, longitude: location.longitude },
+        { latitude: route.params.targetLocation.latitude, longitude: route.params.targetLocation.longitude }
+      ]);
+      if (mapRef.current) {
+        mapRef.current.animateToRegion({
+          latitude: route.params.targetLocation.latitude,
+          longitude: route.params.targetLocation.longitude,
+          latitudeDelta: 0.1,
+          longitudeDelta: 0.1,
+        });
       }
-    })();
-  }, []);
+    } else {
+      setPolyline(null);
+    }
+  }, [route.params?.targetLocation, location]);
 
   const handleGetLocation = async () => {
     setIsLocating(true);
@@ -160,25 +154,6 @@ export default function HomeScreen({ navigation }) {
                 latitude: fakeLat, longitude: fakeLng, latitudeDelta: 0.2, longitudeDelta: 0.2,
               });
             }
-
-            // Gửi vị trí GPS thật lên server (throttle theo LOCATION_SEND_INTERVAL_MS)
-            // để web admin và các tàu khác thấy được tàu này đang di chuyển.
-            const now = Date.now();
-            if (myVesselIdRef.current && now - lastSentAtRef.current > LOCATION_SEND_INTERVAL_MS) {
-              lastSentAtRef.current = now;
-              const speedKnots = currentPos.coords.speed && currentPos.coords.speed > 0
-                ? parseFloat((currentPos.coords.speed * 1.94384).toFixed(1)) // m/s -> hải lý/h
-                : 0;
-              postVesselLocation(myVesselIdRef.current, {
-                latitude: fakeLat,
-                longitude: fakeLng,
-                speed: speedKnots,
-                heading: currentPos.coords.heading || 0,
-              })
-                .then(() => console.log('📍 Đã gửi vị trí GPS lên server:', fakeLat.toFixed(4), fakeLng.toFixed(4)))
-                .catch((e) => console.log('⚠️ Gửi vị trí GPS lên server thất bại:', e.message));
-            }
-
             return offsetToUse;
           });
           setIsLocating(false);
@@ -212,7 +187,7 @@ export default function HomeScreen({ navigation }) {
 
       if (data.status === 200) {
         const nav = data.metadata;
-        
+
         // Nếu app chưa có GPS, lấy vị trí của tàu user trên DB làm điểm bắt đầu
         if (!location) {
           setLocation({
@@ -221,12 +196,12 @@ export default function HomeScreen({ navigation }) {
           });
           // Focus map vào tàu của mình
           if (mapRef.current) {
-             mapRef.current.animateToRegion({
-               latitude: nav.current_vessel.latitude,
-               longitude: nav.current_vessel.longitude,
-               latitudeDelta: 0.2,
-               longitudeDelta: 0.2,
-             });
+            mapRef.current.animateToRegion({
+              latitude: nav.current_vessel.latitude,
+              longitude: nav.current_vessel.longitude,
+              latitudeDelta: 0.2,
+              longitudeDelta: 0.2,
+            });
           }
         }
 
@@ -309,14 +284,15 @@ export default function HomeScreen({ navigation }) {
             markers={[
               ...(location ? [{ id: 'me', lat: location.latitude, lng: location.longitude, type: 'me', title: 'Vị trí của tôi' }] : []),
               ...liveVessels.map(v => ({ id: String(v.id), lat: v.lat, lng: v.lng, type: v.type, title: v.title })),
+              ...(route.params?.targetLocation ? [{ id: 'target', lat: route.params.targetLocation.latitude, lng: route.params.targetLocation.longitude, type: 'virtual', title: 'Mục tiêu (từ Chat)' }] : []),
             ]}
             polyline={
-              isNavigating && location && selectedVessel
+              polyline || (isNavigating && location && selectedVessel
                 ? [
-                    { latitude: location.latitude, longitude: location.longitude },
-                    { latitude: selectedVessel.lat, longitude: selectedVessel.lng },
-                  ]
-                : null
+                  { latitude: location.latitude, longitude: location.longitude },
+                  { latitude: selectedVessel.lat, longitude: selectedVessel.lng },
+                ]
+                : null)
             }
           />
         )}

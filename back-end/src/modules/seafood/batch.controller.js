@@ -157,11 +157,25 @@ const deleteBatch = async (req, res, next) => {
     next(error);
   }
 };
+// [GET] /api/seafood/batches/market — Chợ hải sản (tất cả mẻ cá AVAILABLE)
+const getMarketBatches = async (req, res, next) => {
+  try {
+    const batches = await batchService.getMarketBatches();
+    res.json({
+      status: 200,
+      message: 'Lấy danh sách chợ hải sản thành công',
+      metadata: batches
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
   createBatch,
   getBatches,
   getBatchById,
   updateBatch,
-  deleteBatch
+  deleteBatch,
+  getMarketBatches
 };

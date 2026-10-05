@@ -29,22 +29,74 @@ const createBatch = async (batchData) => {
     latitude, longitude, quality_level, freshness_score, size_min_cm, size_max_cm, status
   } = batchData;
 
+  const hasLocation = latitude != null && longitude != null;
+
+  // Xây mảng values và đánh số $1, $2, ... tuần tự, không bỏ gap
+  const columns = [
+    'vessel_id', 'species_id', 'quantity_kg', 'estimated_quantity_kg', 'catch_time',
+    'catch_location', 'quality_level', 'freshness_score', 'size_min_cm', 'size_max_cm', 'status'
+  ];
+
+  const values = [];
+  const placeholders = [];
+
+  // $1 vessel_id
+  values.push(vessel_id);
+  placeholders.push(`$${values.length}`);
+
+  // $2 species_id
+  values.push(species_id);
+  placeholders.push(`$${values.length}`);
+
+  // $3 quantity_kg
+  values.push(quantity_kg);
+  placeholders.push(`$${values.length}`);
+
+  // $4 estimated_quantity_kg
+  values.push(estimated_quantity_kg ?? null);
+  placeholders.push(`$${values.length}`);
+
+  // $5 catch_time
+  values.push(catch_time ?? null);
+  placeholders.push(`$${values.length}`);
+
+  // catch_location (PostGIS) - chỉ dùng tham số nếu có toạ độ
+  if (hasLocation) {
+    values.push(parseFloat(latitude));
+    const latIdx = values.length;
+    values.push(parseFloat(longitude));
+    const lngIdx = values.length;
+    placeholders.push(`ST_SetSRID(ST_MakePoint($${lngIdx}, $${latIdx}), 4326)`);
+  } else {
+    placeholders.push('NULL');
+  }
+
+  // quality_level
+  values.push(quality_level ?? null);
+  placeholders.push(`$${values.length}`);
+
+  // freshness_score
+  values.push(freshness_score ?? null);
+  placeholders.push(`$${values.length}`);
+
+  // size_min_cm
+  values.push(size_min_cm ?? null);
+  placeholders.push(`$${values.length}`);
+
+  // size_max_cm
+  values.push(size_max_cm ?? null);
+  placeholders.push(`$${values.length}`);
+
+  // status
+  values.push(status || 'AVAILABLE');
+  placeholders.push(`$${values.length}`);
+
   const insertQuery = `
-    INSERT INTO seafood_batches (
-      vessel_id, species_id, quantity_kg, estimated_quantity_kg, catch_time,
-      catch_location, quality_level, freshness_score, size_min_cm, size_max_cm, status
-    )
-    VALUES (
-      $1, $2, $3, $4, $5, 
-      ${latitude != null && longitude != null ? 'ST_SetSRID(ST_MakePoint($7, $6), 4326)' : 'NULL'}, 
-      $8, $9, $10, $11, $12
-    )
+    INSERT INTO seafood_batches (${columns.join(', ')})
+    VALUES (${placeholders.join(', ')})
     RETURNING id, vessel_id, species_id, quantity_kg, status
   `;
-  const values = [
-    vessel_id, species_id, quantity_kg, estimated_quantity_kg, catch_time,
-    latitude, longitude, quality_level, freshness_score, size_min_cm, size_max_cm, status || 'AVAILABLE'
-  ];
+
   const result = await pool.query(insertQuery, values);
   return result.rows[0];
 };
@@ -147,6 +199,27 @@ const deleteBatch = async (batch_id) => {
   return result.rows[0];
 };
 
+/**
+ * Lấy tất cả lô hàng AVAILABLE trên "Chợ hải sản" — ai cũng xem được.
+ */
+const getMarketBatches = async () => {
+  const query = `
+    SELECT 
+      b.id, b.quantity_kg, b.quality_level, b.status, b.created_at,
+      v.owner_id, u.phone AS owner_phone, u.full_name AS owner_name,
+      json_build_object('id', v.id, 'vessel_name', v.vessel_name, 'vessel_code', v.vessel_code) AS vessel,
+      json_build_object('id', s.id, 'name_vi', s.name_vi, 'name_en', s.name_en, 'image_url', s.image_url) AS species
+    FROM seafood_batches b
+    JOIN vessels v ON b.vessel_id = v.id
+    JOIN seafood_species s ON b.species_id = s.id
+    JOIN users u ON v.owner_id = u.id
+    WHERE b.status = 'AVAILABLE'
+    ORDER BY b.created_at DESC
+  `;
+  const result = await pool.query(query);
+  return result.rows;
+};
+
 module.exports = {
   checkVesselOwnership,
   checkSpeciesExists,
@@ -155,5 +228,6 @@ module.exports = {
   getBatchesByOwner,
   getBatchByIdAndOwner,
   updateBatch,
-  deleteBatch
+  deleteBatch,
+  getMarketBatches
 };
