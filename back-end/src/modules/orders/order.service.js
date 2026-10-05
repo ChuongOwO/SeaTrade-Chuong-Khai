@@ -64,7 +64,8 @@ const createOrderFromOffer = async (offer) => {
 };
 
 /**
- * Lấy danh sách đơn hàng của 1 user (cả mua lẫn bán)
+ * Lấy danh sách đơn hàng của 1 user (cả mua lẫn bán).
+ * userId = null -> toàn bộ đơn trong hệ thống (ADMIN).
  */
 const getOrdersByUser = async (userId) => {
   const result = await pool.query(
@@ -77,7 +78,9 @@ const getOrdersByUser = async (userId) => {
          'quantity_kg', oi.quantity_kg,
          'price_per_kg', oi.price_per_kg,
          'subtotal', oi.subtotal,
-         'species_name', s.name_vi
+         'species_name', s.name_vi,
+         'vessel_code', v.vessel_code,
+         'vessel_name', v.vessel_name
        )) AS items
      FROM orders o
      JOIN users buyer ON o.buyer_id = buyer.id
@@ -86,7 +89,8 @@ const getOrdersByUser = async (userId) => {
      LEFT JOIN seafood_listings l ON oi.listing_id = l.id
      LEFT JOIN seafood_batches b ON l.batch_id = b.id
      LEFT JOIN seafood_species s ON b.species_id = s.id
-     WHERE o.buyer_id = $1 OR o.seller_id = $1
+     LEFT JOIN vessels v ON b.vessel_id = v.id
+     WHERE $1::uuid IS NULL OR o.buyer_id = $1 OR o.seller_id = $1
      GROUP BY o.id, buyer.id, seller.id
      ORDER BY o.created_at DESC`,
     [userId]
@@ -94,4 +98,12 @@ const getOrdersByUser = async (userId) => {
   return result.rows;
 };
 
-module.exports = { createOrderFromOffer, getOrdersByUser };
+const updateOrderStatus = async (orderId, status) => {
+  const result = await pool.query(
+    'UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id, status, updated_at',
+    [status, orderId]
+  );
+  return result.rows[0] || null;
+};
+
+module.exports = { createOrderFromOffer, getOrdersByUser, updateOrderStatus };
