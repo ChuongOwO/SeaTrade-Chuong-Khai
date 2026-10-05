@@ -25,7 +25,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { SEAFOOD_SPECIES } from '../data/mockData';
-import ChatPanel from './ChatPanel';
+import ChatInbox from './ChatInbox';
 
 export default function MobileAppSimulator({ posts, setPosts, vessels, orders, setOrders, offlineMode, activeRole, setActiveRole, currentUser }) {
   const [mobileTab, setMobileTab] = useState('HOME'); // 'HOME', 'SCAN_POST', 'ORDERS'
@@ -33,7 +33,6 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
   // Màn "Lịch Sử" (mobileTab === 'ORDERS') chia làm 2 tab con theo yêu cầu của đồng đội:
   // 1 tab Giao dịch (nội dung cũ, giữ nguyên) + 1 tab Chat (mới, xem ChatPanel.jsx).
   const [historySubTab, setHistorySubTab] = useState('TRANSACTIONS'); // 'TRANSACTIONS' | 'CHAT'
-  const [selectedChatOrder, setSelectedChatOrder] = useState(null);
   
   // Fisherman Mode State: AI Scanning & Post Creation
   const [selectedSamplePhoto, setSelectedSamplePhoto] = useState(SEAFOOD_SPECIES[0]);
@@ -513,7 +512,7 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
                   <Clock className="w-4 h-4 text-cyan-400" /> Lịch Sử
                 </h3>
                 <button
-                  onClick={() => { setMobileTab('HOME'); setSelectedChatOrder(null); }}
+                  onClick={() => { setMobileTab('HOME'); }}
                   className="text-slate-400 hover:text-white text-xs"
                 >
                   Đóng
@@ -523,7 +522,7 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
               {/* Góc trên: 2 tab Giao dịch / Chat (theo yêu cầu của đồng đội) */}
               <div className="flex gap-1.5 p-1 bg-slate-900/80 border border-slate-800 rounded-xl">
                 <button
-                  onClick={() => { setHistorySubTab('TRANSACTIONS'); setSelectedChatOrder(null); }}
+                  onClick={() => { setHistorySubTab('TRANSACTIONS'); }}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                     historySubTab === 'TRANSACTIONS' ? 'bg-cyan-600 text-white' : 'text-slate-400'
                   }`}
@@ -531,7 +530,7 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
                   <Clock className="w-3.5 h-3.5" /> Giao dịch
                 </button>
                 <button
-                  onClick={() => { setHistorySubTab('CHAT'); setSelectedChatOrder(null); }}
+                  onClick={() => { setHistorySubTab('CHAT'); }}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                     historySubTab === 'CHAT' ? 'bg-cyan-600 text-white' : 'text-slate-400'
                   }`}
@@ -568,32 +567,7 @@ export default function MobileAppSimulator({ posts, setPosts, vessels, orders, s
                 )
               )}
 
-              {historySubTab === 'CHAT' && (
-                selectedChatOrder ? (
-                  <ChatPanel
-                    order={selectedChatOrder}
-                    currentUser={currentUser}
-                    onClose={() => setSelectedChatOrder(null)}
-                  />
-                ) : orders.length === 0 ? (
-                  <div className="p-6 text-center text-slate-400 text-xs">Chưa có đơn hàng nào để trò chuyện.</div>
-                ) : (
-                  orders.map((order) => (
-                    <button
-                      key={order.id}
-                      onClick={() => setSelectedChatOrder(order)}
-                      className="w-full glass-panel p-3 space-y-1.5 border-slate-800 hover:border-cyan-500/40 text-left transition-all"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-cyan-300 text-xs font-bold">{order.id}</span>
-                        <MessageCircle className="w-3.5 h-3.5 text-slate-500" />
-                      </div>
-                      <p className="text-white font-semibold text-xs">{order.speciesName} • {order.quantityKg} kg</p>
-                      <p className="text-[11px] text-slate-400 truncate">{order.sellerName} ↔ {order.buyerName}</p>
-                    </button>
-                  ))
-                )
-              )}
+              {historySubTab === 'CHAT' && <ChatInbox currentUser={currentUser} />}
             </div>
           )}
 
