@@ -427,6 +427,61 @@ body {
   font-size: 0.9375rem;
 }
 
+/* Các biến thể dưới đây cũng đã được dùng trong JSX (FleetManagement,
+   AdminDashboard...) mà chưa có định nghĩa. */
+.btn-outline {
+  background: transparent;
+  color: var(--primary-deep);
+  border-color: var(--border-color-strong);
+}
+
+.btn-outline:hover {
+  border-color: var(--primary);
+  background: #f0fdfa;
+}
+
+.btn-outline-destructive {
+  background: transparent;
+  color: var(--danger);
+  border-color: #fecdd3;
+}
+
+.btn-outline-destructive:hover {
+  background: #fff1f2;
+  border-color: var(--danger);
+}
+
+.btn-destructive {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+.btn-destructive:hover {
+  background: #9f1239;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover {
+  background: #f5f0e6;
+  color: var(--text-main);
+}
+
+.btn-icon {
+  min-height: 36px;
+  width: 36px;
+  padding: 0;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Layout utilities */
 .page-section {
   display: flex;
@@ -440,6 +495,21 @@ body {
   flex-direction: column;
   gap: 0.25rem;
   padding-bottom: 0.25rem;
+}
+
+/* Header có nút hành động bên phải (Tải lại, Thêm mới...). Dùng class riêng
+   thay cho utility md:flex-row vì .page-header ở trên không nằm trong @layer
+   nên luôn thắng utility của Tailwind v4. */
+.page-header-row {
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .page-header-row {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
 }
 
 .page-header-title {
