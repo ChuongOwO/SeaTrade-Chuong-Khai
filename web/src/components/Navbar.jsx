@@ -12,6 +12,7 @@ import {
   Package,
   Ship,
   Users,
+  Bot,
   LogOut
 } from 'lucide-react';
 import { getAllowedTabs } from '../config/permissions';
@@ -21,6 +22,7 @@ const NAV_GROUPS = [
     label: 'Quản Trị Hệ Thống',
     items: [
       { id: 'admin', label: 'Web Admin', icon: ShieldCheck },
+      { id: 'ai-assistant', label: 'Trợ Lý AI', icon: Bot },
       { id: 'orders', label: 'Đơn Hàng', icon: Package },
       { id: 'fleet', label: 'Đội Tàu', icon: Ship },
       { id: 'users', label: 'Người Dùng', icon: Users },

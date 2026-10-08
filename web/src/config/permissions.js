@@ -9,7 +9,7 @@
 // quyền chỉ phụ thuộc trực tiếp vào cột `role` của tài khoản.
 export const ROLE_ALLOWED_TABS = {
   // Admin: toàn quyền quản trị hệ thống.
-  ADMIN: ['admin', 'orders', 'fleet', 'users', 'analytics', 'mobile', 'ai-vision', 'sea-map', 'user-manual'],
+  ADMIN: ['admin', 'ai-assistant', 'orders', 'fleet', 'users', 'analytics', 'mobile', 'ai-vision', 'sea-map', 'user-manual'],
   // Thuyền trưởng tàu đánh bắt: chỉ dùng các công cụ tác nghiệp của mình,
   // không thấy các trang quản trị hệ thống (Web Admin/Đơn Hàng/Đội Tàu/Thống Kê).
   FISHERMAN: ['mobile', 'ai-vision', 'sea-map', 'user-manual'],

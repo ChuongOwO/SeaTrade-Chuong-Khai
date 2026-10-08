@@ -17,6 +17,19 @@ const updateUserSchema = Joi.object({
   'object.missing': 'Cần truyền ít nhất role hoặc status'
 });
 
+const agentChatSchema = Joi.object({
+  conversationId: Joi.string().uuid().allow(null),
+  message: Joi.string().trim().min(1).max(4000).required().messages({
+    'string.empty': 'Vui lòng nhập câu hỏi cho trợ lý'
+  })
+});
+
+const agentConfirmSchema = Joi.object({
+  conversationId: Joi.string().uuid().required(),
+  // { [mã thao tác]: true = duyệt, false = từ chối }
+  decisions: Joi.object().pattern(Joi.string(), Joi.boolean()).required()
+});
+
 // source = 'body' | 'query'
 const validate = (schema, source = 'body') => (req, res, next) => {
   const { error } = schema.validate(req[source], { abortEarly: false });
@@ -30,4 +43,4 @@ const validate = (schema, source = 'body') => (req, res, next) => {
   next();
 };
 
-module.exports = { listUsersQuerySchema, updateUserSchema, validate };
+module.exports = { listUsersQuerySchema, updateUserSchema, agentChatSchema, agentConfirmSchema, validate };
