@@ -9,6 +9,7 @@ import AIVisionPlayground from './components/AIVisionPlayground';
 import MaritimeMap from './components/MaritimeMap';
 import AnalyticsView from './components/AnalyticsView';
 import UserManagement from './components/UserManagement';
+import AIAssistant from './components/AIAssistant';
 import UserManual from './components/UserManual';
 
 import { INITIAL_POSTS, INITIAL_VESSELS, INITIAL_ORDERS } from './data/mockData';
@@ -159,6 +160,10 @@ export default function App() {
             posts={posts}
             orders={orders}
           />
+        )}
+
+        {canViewActiveTab && activeTab === 'ai-assistant' && (
+          <AIAssistant />
         )}
 
         {canViewActiveTab && activeTab === 'users' && (

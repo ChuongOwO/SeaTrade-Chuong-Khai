@@ -860,3 +860,121 @@ body {
     border-width: 6px;
   }
 }
+
+/* ============================================================
+   TRỢ LÝ AI (AIAssistant.jsx)
+   Điểm nhấn duy nhất là "phiếu chờ duyệt" (.agent-action): viền cam bên
+   trái = thao tác thay đổi dữ liệu đang đợi admin quyết định.
+   ============================================================ */
+.agent-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 60vh;
+  padding: 0;
+  overflow: hidden;
+}
+
+.agent-thread {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+.agent-empty {
+  margin: auto;
+  max-width: 36rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.agent-suggestion {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border-color-strong);
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  color: var(--text-sub);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.agent-suggestion:hover {
+  border-color: var(--primary);
+  color: var(--primary-deep);
+}
+
+.agent-question {
+  max-width: min(36rem, 85%);
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  background: #e6f6f4;
+  color: var(--primary-deep);
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+}
+
+.agent-action {
+  max-width: 36rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: #fff7ed;
+}
+
+.agent-action[data-decision="true"] {
+  border-left-color: var(--success);
+  background: #ecfdf5;
+  color: var(--success);
+}
+
+.agent-action[data-decision="false"] {
+  border-left-color: var(--border-color-strong);
+  background: var(--bg-main);
+  color: var(--text-muted);
+}
+
+.agent-composer {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.agent-typing {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.agent-typing span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation: agent-typing 1.2s infinite ease-in-out;
+}
+
+.agent-typing span:nth-child(2) { animation-delay: 0.15s; }
+.agent-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes agent-typing {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-typing span { animation: none; opacity: 0.6; }
+}
+
+@media (max-width: 640px) {
+  .agent-thread { padding: 1rem; }
+  .agent-composer { padding: 0.75rem 1rem; flex-direction: column; }
+  .agent-composer .btn { align-self: stretch; }
+}
