@@ -9,6 +9,9 @@ router.use(authMiddleware);
 // Lấy danh sách đơn hàng của tôi
 router.get('/', orderController.getMyOrders);
 
+// Mua ngay cả mẻ theo giá niêm yết  body: { batch_id }
+router.post('/buy-now', orderController.buyNow);
+
 router.patch('/:id/status', requireRole('ADMIN'), orderController.updateOrderStatus);
 
 module.exports = router;

@@ -78,6 +78,14 @@ const acceptOffer = async (req, res, next) => {
       return res.status(403).json({ status: 403, message: 'Bạn không có quyền xử lý đề xuất này' });
     }
 
+    // Mẻ cá có thể vừa bị người khác bấm "Mua ngay" -> không cho chốt offer nữa.
+    if (!(await orderService.isListingBatchAvailable(offer.listing_id))) {
+      return res.status(409).json({
+        status: 409,
+        message: 'Mẻ cá này đã được người khác mua hoặc đang được giữ chờ thanh toán',
+      });
+    }
+
     const accepted = await offerService.acceptOffer(offerId);
 
     // Tạo đơn hàng tự động
