@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme';
 import { fetchMessages, sendMessage } from '../api/chatApi';
 import { API_URL } from '../config/api';
+import OrderPaymentPanel from './OrderPaymentPanel';
 
 const POLL_INTERVAL_MS = 15000; // Giảm tải vì đã có Socket.io
 
@@ -26,11 +27,16 @@ function parseMessageContent(raw) {
     if (parsed.__type === 'PRICE_OFFER') return { type: 'price_offer', data: parsed };
     if (parsed.__type === 'OFFER_ACCEPTED') return { type: 'offer_accepted', data: parsed };
     if (parsed.__type === 'OFFER_REJECTED') return { type: 'offer_rejected', data: parsed };
+    if (parsed.__type === 'PAYMENT_SUCCESS') return { type: 'payment_success', data: parsed };
+    if (parsed.__type === 'PAYMENT_RECEIVED') return { type: 'payment_received', data: parsed };
+    if (parsed.__type === 'BUY_NOW_ORDER') return { type: 'buy_now_order', data: parsed };
     return { type: 'text', data: raw };
   } catch {
     return { type: 'text', data: raw };
   }
 }
+
+export const negotiationKey = (conversationId) => `negotiation_context_${conversationId}`;
 
 function formatVND(n) {
   return Number(n).toLocaleString('vi-VN') + 'đ';
@@ -65,14 +71,17 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
         try { setMyUserId(JSON.parse(raw).id); } catch { }
       }
     });
-    // Đọc negotiation context (nếu đến từ MarketScreen)
-    AsyncStorage.getItem('negotiation_context').then((raw) => {
-      if (raw) {
+    // Mẻ cá đang thương lượng trong hội thoại này (lưu riêng từng hội thoại khi bấm "Thương lượng"
+    // ở Chợ). Đọc thêm key cũ 'negotiation_context' cho dữ liệu lưu trước bản cập nhật.
+    AsyncStorage.multiGet([negotiationKey(conversation.id), 'negotiation_context']).then((pairs) => {
+      for (const [, raw] of pairs) {
+        if (!raw) continue;
         try {
           const ctx = JSON.parse(raw);
           if (ctx.conversation_id === conversation.id) {
             setNegotiation(ctx);
             setQtyInput(String(ctx.quantity_kg || ''));
+            return;
           }
         } catch { }
       }
@@ -335,6 +344,15 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
 
   const peerName = conversation.peer?.full_name || conversation.peer?.phone || 'Người dùng';
 
+  // Thanh thương lượng: chỉ cho người mua, ẩn khi mẻ cá đã chốt đơn (chấp nhận đề xuất / Mua ngay)
+  // sau thời điểm bắt đầu thương lượng.
+  const dealClosed = negotiation && messages.some((m) => {
+    const { type } = parseMessageContent(m.message);
+    if (type !== 'offer_accepted' && type !== 'buy_now_order') return false;
+    return !negotiation.saved_at || new Date(m.created_at) >= new Date(negotiation.saved_at);
+  });
+  const showDealBar = Boolean(negotiation && myUserId && negotiation.seller_id !== myUserId && !dealClosed);
+
   // === Render bong bóng ===
   const renderBubble = (item) => {
     const isMine = item.sender_id === myUserId;
@@ -467,6 +485,48 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
             ✅ Đã chốt đơn! {data.species_name} — {formatVND(data.price_per_kg)}/kg × {data.quantity_kg}kg = {formatVND(data.total)}
           </Text>
           <Text style={styles.systemSubText}>Đơn hàng đã được tạo. Xem tại tab Giao dịch.</Text>
+          {data.order_id ? <OrderPaymentPanel orderId={data.order_id} refreshKey={messages.length} /> : null}
+        </View>
+      );
+    }
+
+    // === MUA NGAY (người mua bấm Mua ngay trên chợ) ===
+    if (type === 'buy_now_order') {
+      return (
+        <View style={styles.systemBubble}>
+          <Ionicons name="flash" size={26} color={colors.primary} />
+          <Text style={styles.systemText}>
+            ⚡ Mua ngay cả mẻ! {data.species_name || 'Hải sản'} — {formatVND(data.price_per_kg)}/kg × {data.quantity_kg}kg = {formatVND(data.total)}
+          </Text>
+          <Text style={styles.systemSubText}>Mẻ cá đang được giữ chờ người mua thanh toán qua VNPay.</Text>
+          {data.order_id ? <OrderPaymentPanel orderId={data.order_id} refreshKey={messages.length} /> : null}
+        </View>
+      );
+    }
+
+    // === NGƯỜI BÁN XÁC NHẬN ĐÃ NHẬN TIỀN (bằng chứng cho cả 2 bên) ===
+    if (type === 'payment_received') {
+      const methodText = { CASH: 'tiền mặt', BANK_TRANSFER: 'chuyển khoản', VNPAY: 'qua VNPay' }[data.method] || 'chuyển khoản';
+      return (
+        <View style={styles.systemBubble}>
+          <Ionicons name="cash" size={24} color={colors.success} />
+          <Text style={styles.systemText}>
+            💵 Người bán xác nhận đã nhận {formatVND(data.amount)} ({methodText})
+          </Text>
+          <Text style={styles.systemSubText}>Xác nhận lúc {formatMessageTime(item.created_at)} — lưu làm bằng chứng giao dịch.</Text>
+        </View>
+      );
+    }
+
+    // === PAYMENT SUCCESS (back-end gửi khi VNPay xác nhận) ===
+    if (type === 'payment_success') {
+      return (
+        <View style={styles.systemBubble}>
+          <Ionicons name="card" size={24} color={colors.success} />
+          <Text style={styles.systemText}>
+            💳 Người mua đã thanh toán {formatVND(data.amount)} qua VNPay
+          </Text>
+          <Text style={styles.systemSubText}>Người bán có thể chuẩn bị giao hàng.</Text>
         </View>
       );
     }
@@ -561,6 +621,31 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
           }
           renderItem={({ item }) => renderBubble(item)}
         />
+      )}
+
+      {showDealBar && (
+        <View style={styles.dealBar}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.dealBarTitle} numberOfLines={1}>
+              🐟 {negotiation.species_name} • {negotiation.quantity_kg}kg
+            </Text>
+            <Text style={styles.dealBarSub} numberOfLines={1}>
+              {Number(negotiation.price_per_kg) > 0
+                ? `Giá niêm yết ${formatVND(negotiation.price_per_kg)}/kg — đề xuất giá của bạn`
+                : 'Đề xuất giá để người bán chấp nhận và tạo đơn'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.dealBarBtn}
+            onPress={() => { setShowActions(false); setPriceModalVisible(true); }}
+            disabled={sending}
+            accessibilityRole="button"
+            accessibilityLabel="Đề xuất giá mua"
+          >
+            <Ionicons name="pricetag" size={14} color="#fff" />
+            <Text style={styles.dealBarBtnText}>Đề xuất giá</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {showActions && (
@@ -804,6 +889,17 @@ const styles = StyleSheet.create({
   systemText: { fontSize: 13, color: colors.textPrimary, fontWeight: '600', textAlign: 'center', marginTop: 4 },
   systemSubText: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
 
+  dealBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: '#fffbeb', borderTopWidth: 1, borderTopColor: '#fde68a',
+  },
+  dealBarTitle: { fontSize: 13, fontWeight: 'bold', color: colors.textPrimary },
+  dealBarSub: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  dealBarBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: colors.warningAccent, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10,
+  },
+  dealBarBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
   actionsBar: {
     flexDirection: 'row', gap: 20, paddingHorizontal: 20, paddingVertical: 12,
     backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border,

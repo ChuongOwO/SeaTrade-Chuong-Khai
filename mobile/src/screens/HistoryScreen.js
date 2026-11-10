@@ -11,6 +11,8 @@ import { fetchConversations, startConversation } from '../api/chatApi';
 import ChatThread from '../components/ChatThread';
 import { useNotifications } from '../context/NotificationContext';
 import { API_URL } from '../config/api';
+import VnpayCheckoutModal from '../components/VnpayCheckoutModal';
+import { previewMessage } from '../utils/messagePreview';
 
 const STATUS_LABEL = {
   PENDING: 'Chờ xác nhận',
@@ -41,6 +43,7 @@ export default function HistoryScreen({ route, navigation }) {
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [myUserId, setMyUserId] = useState(null);
+  const [payingOrderId, setPayingOrderId] = useState(null);
 
   useEffect(() => {
     AsyncStorage.getItem('userData').then(raw => {
@@ -148,6 +151,11 @@ export default function HistoryScreen({ route, navigation }) {
     const formatVND = (n) => Number(n).toLocaleString('vi-VN') + 'đ';
 
     const counterpartyPhone = isBuyer ? item.seller?.phone : item.buyer?.phone;
+    const isBuyNow = item.purchase_type === 'BUY_NOW';
+    const holdExpired = item.hold_expires_at && new Date(item.hold_expires_at) <= new Date();
+    const holdUntil = item.hold_expires_at && !item.is_paid && !holdExpired
+      ? new Date(item.hold_expires_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+      : null;
 
     return (
       <TouchableOpacity
@@ -157,7 +165,9 @@ export default function HistoryScreen({ route, navigation }) {
       >
         <View style={styles.cardTop}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.species}>{speciesName}</Text>
+            <Text style={styles.species}>
+              {speciesName}{isBuyNow ? <Text style={styles.buyNowTag}>  ⚡ Mua ngay</Text> : null}
+            </Text>
             <Text style={styles.meta}>
               {isBuyer ? 'Mua từ' : 'Bán cho'}: {counterparty} • {firstItem?.quantity_kg}kg
             </Text>
@@ -177,6 +187,36 @@ export default function HistoryScreen({ route, navigation }) {
           <Text style={styles.totalLabel}>Tổng đơn:</Text>
           <Text style={styles.totalValue}>{formatVND(item.total_amount)}</Text>
         </View>
+        {!isCancelled && (
+          <View style={styles.paymentRow}>
+            {item.is_paid ? (
+              <View style={[styles.payBadge, styles.payBadgePaid]}>
+                <Ionicons name="shield-checkmark" size={13} color={colors.success} />
+                <Text style={[styles.payBadgeText, { color: colors.success }]}>Đã thanh toán</Text>
+              </View>
+            ) : (
+              <View style={[styles.payBadge, styles.payBadgeUnpaid]}>
+                <Ionicons name="time-outline" size={13} color="#d97706" />
+                <Text style={[styles.payBadgeText, { color: '#d97706' }]}>
+                  {holdUntil
+                    ? `Giữ hàng đến ${holdUntil}`
+                    : isBuyer ? 'Chưa thanh toán' : 'Chờ người mua thanh toán'}
+                </Text>
+              </View>
+            )}
+            {isBuyer && !item.is_paid && item.status === 'CONFIRMED' && !holdExpired && (
+              <TouchableOpacity
+                style={styles.payBtn}
+                onPress={() => setPayingOrderId(item.id)}
+                accessibilityRole="button"
+                accessibilityLabel="Thanh toán đơn hàng qua VNPay"
+              >
+                <Ionicons name="card" size={14} color="#fff" />
+                <Text style={styles.payBtnText}>Thanh toán VNPay</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -210,7 +250,7 @@ export default function HistoryScreen({ route, navigation }) {
             {peerName}
           </Text>
           <Text style={[styles.chatLastMessage, isUnread && styles.chatLastMessageUnread]} numberOfLines={1}>
-            {item.last_message || 'Chưa có tin nhắn'}
+            {previewMessage(item.last_message)}
           </Text>
         </View>
         <View style={styles.chatCardRight}>
@@ -313,6 +353,17 @@ export default function HistoryScreen({ route, navigation }) {
             onRefresh={loadOrders}
           />
         )
+      )}
+
+      {payingOrderId && (
+        <VnpayCheckoutModal
+          visible
+          orderId={payingOrderId}
+          onDone={() => {
+            setPayingOrderId(null);
+            loadOrders();
+          }}
+        />
       )}
 
       {tab === 'CHAT' && (
@@ -483,6 +534,20 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
   },
+  buyNowTag: { fontSize: 11, fontWeight: '700', color: colors.primary },
+  paymentRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border, gap: 8,
+  },
+  payBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  payBadgePaid: { backgroundColor: '#dcfce7' },
+  payBadgeUnpaid: { backgroundColor: '#fef3c7' },
+  payBadgeText: { fontSize: 11, fontWeight: '700' },
+  payBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8,
+  },
+  payBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
