@@ -21,7 +21,12 @@ const resolveLanIp = () => {
   return ip;
 };
 
-const getApiUrl = () => `http://${resolveLanIp()}:5000`;
+// Bản build gửi cho người dùng phải đặt EXPO_PUBLIC_API_URL=https://<domain-api>
+// (xem mobile/.env.example); khi dev bỏ trống để tự dùng IP máy chạy Expo.
+const getApiUrl = () => {
+  const configured = (process.env.EXPO_PUBLIC_API_URL || '').trim().replace(/\/+$/, '');
+  return configured || `http://${resolveLanIp()}:5000`;
+};
 
 export const API_URL = getApiUrl();
 
@@ -52,3 +57,8 @@ export const API_NOTIFICATIONS_UNREAD_COUNT_URL = `${API_NOTIFICATIONS_URL}/unre
 // GET /my-vessel lấy vessel_id của tàu mình; POST /:id/locations gửi vị trí
 // GPS thật lên định kỳ. Xem mobile/src/api/vesselsApi.js + screens/HomeScreen.js.
 export const API_VESSELS_URL = `${API_URL}/api/vessels`;
+
+// Thanh toán VNPay (back-end/src/modules/payments) — xem mobile/src/api/paymentsApi.js
+export const API_PAYMENTS_URL = `${API_URL}/api/payments`;
+// WebView nhận ra URL này (VNPAY_RETURN_URL của back-end) để tự đóng sau khi thanh toán
+export const VNPAY_RETURN_PATH = '/api/payments/vnpay/return';

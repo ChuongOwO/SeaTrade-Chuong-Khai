@@ -19,6 +19,7 @@ const notificationsRoutes = require('./modules/notifications/notifications.route
 const offerRoutes = require('./modules/offers/offer.routes');
 const orderRoutes = require('./modules/orders/order.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
+const paymentRoutes = require('./modules/payments/payment.routes');
 
 const app = express();
 
@@ -63,6 +64,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/offers', offerRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Global Error Handler
@@ -104,6 +106,20 @@ app.get('/api/users/:id/online', (req, res) => {
   const isOnline = onlineUsers.has(req.params.id);
   res.json({ isOnline });
 });
+
+// Mỗi phút: huỷ đơn "Mua ngay" quá hạn giữ hàng mà chưa thanh toán, trả mẻ cá về chợ.
+const orderService = require('./modules/orders/order.service');
+setInterval(async () => {
+  try {
+    const released = await orderService.releaseExpiredHolds();
+    if (released.length > 0) {
+      console.log(`[ORDER] Đã huỷ ${released.length} đơn Mua ngay quá hạn giữ hàng`);
+      released.forEach((o) => io.emit(`payment_updated_${o.id}`, { order_id: o.id }));
+    }
+  } catch (err) {
+    console.error('[ORDER] Lỗi khi nhả hàng quá hạn:', err.message);
+  }
+}, 60 * 1000);
 
 // Start Server
 server.listen(env.port, () => {

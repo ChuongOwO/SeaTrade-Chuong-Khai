@@ -1,4 +1,5 @@
 const pool = require('../../config/database');
+const { previewMessage } = require('./message.preview');
 
 // Tìm user theo SĐT (dùng để bắt đầu 1 cuộc hội thoại mới bằng SĐT của đối tác)
 const findUserByPhone = async (phone) => {
@@ -155,7 +156,7 @@ const createMessage = async (conversationId, senderId, message) => {
     await client.query(
       `INSERT INTO notifications (user_id, title, content, notification_type, reference_id)
        VALUES ($1, $2, $3, 'NEW_MESSAGE', $4)`,
-      [recipientId, `Tin nhắn mới từ ${convo.sender_name}`, message, conversationId]
+      [recipientId, `Tin nhắn mới từ ${convo.sender_name}`, previewMessage(message), conversationId]
     );
 
     await client.query('COMMIT');

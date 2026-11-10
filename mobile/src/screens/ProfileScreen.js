@@ -9,6 +9,30 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { API_AVATAR_URL } from '../config/api';
 
+// Khớp enum user_role trong back-end/migrations/V1__init_schema.sql
+const ROLE_INFO = {
+  FISHERMAN: {
+    icon: 'boat',
+    label: 'Ngư Dân',
+    hint: 'Chế độ Ngư Dân: Quét ảnh AI, báo cáo sản lượng và bật định vị chờ tàu thu mua.',
+  },
+  TRADER: {
+    icon: 'cube',
+    label: 'Thương Lái',
+    hint: 'Chế độ Thương Lái: Theo dõi bản đồ tàu đánh bắt, chốt đơn và dẫn đường trên biển.',
+  },
+  COLLECTOR: {
+    icon: 'boat-outline',
+    label: 'Tàu Thu Mua',
+    hint: 'Chế độ Tàu Thu Mua: Gom hàng từ các tàu đánh bắt và vận chuyển vào bờ.',
+  },
+  ADMIN: {
+    icon: 'shield-checkmark',
+    label: 'Quản Trị Viên',
+    hint: 'Tài khoản quản trị: quản lý người dùng, đội tàu và đơn hàng trên web admin.',
+  },
+};
+
 export default function ProfileScreen() {
   const [userData, setUserData] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -103,6 +127,8 @@ export default function ProfileScreen() {
   }
 
   const dynamicStyles = getDynamicStyles(colors);
+  // Back-end trả role viết HOA (FISHERMAN, TRADER...) — chuẩn hoá trước khi tra cứu
+  const roleInfo = ROLE_INFO[String(userData.role || '').toUpperCase()] || ROLE_INFO.FISHERMAN;
 
   return (
     <SafeAreaView style={dynamicStyles.container}>
@@ -134,21 +160,11 @@ export default function ProfileScreen() {
           <Text style={dynamicStyles.sectionTitle}>Vai trò của bạn</Text>
           <View style={dynamicStyles.roleToggle}>
             <View style={[dynamicStyles.roleBtn, dynamicStyles.roleBtnActive, { flex: 1 }]}>
-              <Ionicons
-                name={userData.role === 'fisherman' ? 'boat' : 'cube'}
-                size={20}
-                color="#fff"
-              />
-              <Text style={[dynamicStyles.roleText, dynamicStyles.roleTextActive]}>
-                {userData.role === 'fisherman' ? 'Ngư Dân' : 'Thương Lái'}
-              </Text>
+              <Ionicons name={roleInfo.icon} size={20} color="#fff" />
+              <Text style={[dynamicStyles.roleText, dynamicStyles.roleTextActive]}>{roleInfo.label}</Text>
             </View>
           </View>
-          <Text style={dynamicStyles.hintText}>
-            {userData.role === 'fisherman'
-              ? 'Chế độ Ngư Dân: Quét ảnh AI, báo cáo sản lượng và bật định vị chờ tàu thu mua.'
-              : 'Chế độ Thương Lái: Theo dõi bản đồ tàu đánh bắt, chốt đơn và dẫn đường trên biển.'}
-          </Text>
+          <Text style={dynamicStyles.hintText}>{roleInfo.hint}</Text>
         </View>
 
         {/* Section Bảng điều khiển */}

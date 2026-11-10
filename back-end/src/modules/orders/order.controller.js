@@ -1,4 +1,5 @@
 const orderService = require('./order.service');
+const { postOrderMessageSafe } = require('./order.chat');
 
 // Khớp enum order_status trong migrations/V1__init_schema.sql
 const ORDER_STATUSES = ['PENDING', 'CONFIRMED', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED', 'REJECTED'];
@@ -44,4 +45,30 @@ const updateOrderStatus = async (req, res, next) => {
   }
 };
 
-module.exports = { getMyOrders, updateOrderStatus };
+// [POST] /api/orders/buy-now  body: { batch_id }
+// Tạo đơn "Mua ngay" (giữ mẻ cá chờ thanh toán) và báo vào chat với người bán.
+const buyNow = async (req, res, next) => {
+  try {
+    const { batch_id } = req.body || {};
+    if (!batch_id) return res.status(400).json({ status: 400, message: 'Thiếu batch_id' });
+
+    const order = await orderService.createBuyNowOrder(batch_id, req.user.id);
+    const conversationId = await postOrderMessageSafe(req, order.id, 'buyer', {
+      __type: 'BUY_NOW_ORDER',
+      species_name: order.species_name,
+      quantity_kg: order.quantity_kg,
+      price_per_kg: order.price_per_kg,
+      total: Number(order.total_amount),
+      hold_expires_at: order.hold_expires_at,
+    });
+    res.status(201).json({
+      status: 201,
+      message: 'Đã giữ mẻ cá, vui lòng thanh toán',
+      metadata: { order, conversation_id: conversationId },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getMyOrders, updateOrderStatus, buyNow };

@@ -7,6 +7,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme';
 import { API_URL } from '../config/api';
 import { startConversation } from '../api/chatApi';
+import { buyNow } from '../api/ordersApi';
+import VnpayCheckoutModal from '../components/VnpayCheckoutModal';
+import { negotiationKey } from '../components/ChatThread';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=200&q=80';
 
@@ -23,6 +26,8 @@ export default function MarketScreen({ navigation }) {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [buyingId, setBuyingId] = useState(null); // mẻ cá đang gọi API Mua ngay
+  const [checkout, setCheckout] = useState(null); // { orderId, holdExpiresAt } -> mở VNPay
 
   useEffect(() => {
     const checkRole = async () => {
@@ -89,15 +94,18 @@ export default function MarketScreen({ navigation }) {
         { text: 'Nhắn tin ngay', onPress: async () => {
           try {
             const conversation = await startConversation(ownerPhone);
-            // Lưu context thương lượng để ChatThread biết đang deal mẻ cá nào
-            await AsyncStorage.setItem('negotiation_context', JSON.stringify({
+            // Lưu context thương lượng RIÊNG cho hội thoại này để ChatThread biết đang deal mẻ cá nào
+            // (mở lại từ tab Lịch Sử vẫn còn; thương lượng mẻ khác với người khác không ghi đè).
+            await AsyncStorage.setItem(negotiationKey(conversation.id), JSON.stringify({
               conversation_id: conversation.id,
               batch_id: item.id,
               seller_id: item.owner_id,
               species_name: speciesName,
               quantity_kg: item.quantity_kg,
+              price_per_kg: item.price_per_kg,
               quality_level: item.quality_level,
               vessel_name: item.vessel?.vessel_name || '',
+              saved_at: new Date().toISOString(),
             }));
             navigation.navigate('History', { openChat: conversation });
           } catch (err) {
@@ -106,6 +114,49 @@ export default function MarketScreen({ navigation }) {
         }}
       ]
     );
+  };
+
+  // Mua ngay CẢ MẺ theo giá niêm yết -> back-end giữ mẻ cá ~15 phút -> mở VNPay
+  const handleBuyNow = (item) => {
+    const speciesName = item.species?.name_vi || 'Hải sản';
+    const total = Math.round(Number(item.quantity_kg) * Number(item.price_per_kg));
+    Alert.alert(
+      'Mua ngay cả mẻ',
+      `${speciesName} — ${item.quantity_kg} kg × ${Number(item.price_per_kg).toLocaleString('vi-VN')} đ/kg\n` +
+        `Tổng: ${total.toLocaleString('vi-VN')} đ\n\n` +
+        'Mẻ cá sẽ được giữ cho bạn 15 phút để thanh toán qua VNPay.',
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        {
+          text: 'Mua ngay',
+          onPress: async () => {
+            setBuyingId(item.id);
+            try {
+              const { order } = await buyNow(item.id);
+              setCheckout({ orderId: order.id, holdExpiresAt: order.hold_expires_at });
+            } catch (err) {
+              Alert.alert('Không mua được', err.message || 'Có lỗi xảy ra.');
+            } finally {
+              setBuyingId(null);
+              fetchMarketBatches();
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCheckoutDone = (status) => {
+    const holdUntil = checkout?.holdExpiresAt
+      ? new Date(checkout.holdExpiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+      : null;
+    setCheckout(null);
+    fetchMarketBatches();
+    if (status === 'PAID') {
+      Alert.alert('Mua thành công', 'Người bán đã được thông báo. Xem đơn và nhắn tin với người bán ở tab Lịch Sử.');
+    } else if (holdUntil) {
+      Alert.alert('Chưa thanh toán', `Mẻ cá vẫn được giữ cho bạn đến ${holdUntil}. Bạn có thể thanh toán ở Lịch Sử → Giao dịch.`);
+    }
   };
 
   const handleDeleteBatch = (item) => {
@@ -169,6 +220,30 @@ export default function MarketScreen({ navigation }) {
               <Ionicons name="trash-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
               <Text style={styles.btnText}>Gỡ khỏi chợ</Text>
             </TouchableOpacity>
+          ) : priceText ? (
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[styles.buyNowBtn, buyingId === item.id && { opacity: 0.6 }]}
+                onPress={() => handleBuyNow(item)}
+                disabled={!!buyingId}
+                accessibilityRole="button"
+                accessibilityLabel={`Mua ngay cả mẻ ${speciesName}`}
+              >
+                {buyingId === item.id
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="flash" size={14} color="#fff" style={{ marginRight: 4 }} />}
+                <Text style={styles.btnText}>Mua ngay</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.negotiateBtn}
+                onPress={() => handleDealPress(item)}
+                accessibilityRole="button"
+                accessibilityLabel={`Nhắn tin thương lượng mua ${speciesName}`}
+              >
+                <Ionicons name="chatbubbles-outline" size={14} color={colors.success} style={{ marginRight: 4 }} />
+                <Text style={styles.negotiateText}>Thương lượng</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <TouchableOpacity style={styles.btn} onPress={() => handleDealPress(item)}>
               <Text style={styles.btnText}>Thỏa thuận & Chốt đơn</Text>
@@ -210,6 +285,10 @@ export default function MarketScreen({ navigation }) {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
           }
         />
+      )}
+
+      {checkout && (
+        <VnpayCheckoutModal visible orderId={checkout.orderId} onDone={handleCheckoutDone} />
       )}
 
       {userRole === 'FISHERMAN' && (
@@ -335,6 +414,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  actionRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  buyNowBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.primary, paddingVertical: 8, borderRadius: 8,
+  },
+  negotiateBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: colors.success, paddingVertical: 7, borderRadius: 8,
+  },
+  negotiateText: { color: colors.success, fontSize: 12, fontWeight: 'bold' },
   btnText: {
     color: colors.textOnPrimary,
     fontSize: 12,

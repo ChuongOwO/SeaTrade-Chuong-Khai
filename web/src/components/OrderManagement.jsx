@@ -47,6 +47,13 @@ function StatusBadge({ status }) {
   return <span className={`badge-sm ${meta.badge}`}>{meta.label}</span>;
 }
 
+// is_paid: đơn đã có khoản thanh toán VNPay PAID (back-end order.service.js)
+function PaymentBadge({ paid }) {
+  return paid
+    ? <span className="badge-sm badge-emerald">Đã thanh toán</span>
+    : <span className="badge-sm badge-amber">Chưa thanh toán</span>;
+}
+
 export default function OrderManagement() {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -139,7 +146,12 @@ export default function OrderManagement() {
           <div className="font-mono text-sm font-bold text-slate-900">{formatVnd(getTotalKg(order))} kg</div>
           <div className="text-xs text-amber-600 font-mono mt-0.5">{(Number(order.total_amount) / 1_000_000).toFixed(1)}Tr VNĐ</div>
         </td>
-        <td><StatusBadge status={order.status} /></td>
+        <td>
+          <div className="flex flex-col items-start gap-1">
+            <StatusBadge status={order.status} />
+            {!CLOSED_STATUSES.includes(order.status) && <PaymentBadge paid={order.is_paid} />}
+          </div>
+        </td>
         <td className="text-right">
           <button onClick={() => openOrder(order)} className="btn btn-outline btn-sm ml-auto">
             <Eye className="w-4 h-4" /> Chi tiết
@@ -256,6 +268,7 @@ export default function OrderManagement() {
             <div className="flex items-center gap-2.5">
               <span className="badge badge-cyan">Chi Tiết Đơn Hàng</span>
               <StatusBadge status={selectedOrder.status} />
+              <PaymentBadge paid={selectedOrder.is_paid} />
             </div>
 
             <h3 className="text-xl font-bold text-slate-900">
