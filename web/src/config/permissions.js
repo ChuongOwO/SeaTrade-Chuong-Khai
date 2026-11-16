@@ -9,14 +9,14 @@
 // quyền chỉ phụ thuộc trực tiếp vào cột `role` của tài khoản.
 export const ROLE_ALLOWED_TABS = {
   // Admin: toàn quyền quản trị hệ thống.
-  ADMIN: ['admin', 'ai-assistant', 'orders', 'fleet', 'users', 'analytics', 'mobile', 'ai-vision', 'sea-map', 'user-manual'],
+  ADMIN: ['admin', 'ai-assistant', 'orders', 'fleet', 'users', 'analytics', 'sea-map', 'user-manual'],
   // Thuyền trưởng tàu đánh bắt: chỉ dùng các công cụ tác nghiệp của mình,
   // không thấy các trang quản trị hệ thống (Web Admin/Đơn Hàng/Đội Tàu/Thống Kê).
-  FISHERMAN: ['mobile', 'ai-vision', 'sea-map', 'user-manual'],
+  FISHERMAN: ['sea-map', 'user-manual'],
   // Tàu thu gom / thương lái: tương tự Fisherman.
-  TRADER: ['mobile', 'ai-vision', 'sea-map', 'user-manual'],
+  TRADER: ['sea-map', 'user-manual'],
   // COLLECTOR dùng chung giao diện với TRADER (xem web/src/api/roleMeta.js).
-  COLLECTOR: ['mobile', 'ai-vision', 'sea-map', 'user-manual'],
+  COLLECTOR: ['sea-map', 'user-manual'],
 };
 
 const DEFAULT_ALLOWED_TABS = ROLE_ALLOWED_TABS.FISHERMAN;

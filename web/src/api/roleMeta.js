@@ -11,30 +11,24 @@
 export const ROLE_META = {
   FISHERMAN: {
     label: 'Thuyền Trưởng Tàu Đánh Bắt',
-    defaultTab: 'mobile',
-    mobileRole: 'FISHERMAN',
+    defaultTab: 'sea-map',
   },
   TRADER: {
     label: 'Tàu Thu Gom / Thương Lái',
-    defaultTab: 'mobile',
-    mobileRole: 'TRADER',
+    defaultTab: 'sea-map',
   },
-  // COLLECTOR dùng chung giao diện mobile với TRADER (đều là bên thu mua) vì
-  // MobileAppSimulator.jsx hiện chỉ có 2 role UI: FISHERMAN / TRADER.
   COLLECTOR: {
     label: 'Tàu Thu Gom / Thương Lái',
-    defaultTab: 'mobile',
-    mobileRole: 'TRADER',
+    defaultTab: 'sea-map',
   },
   ADMIN: {
     label: 'Quản Trị Viên',
     defaultTab: 'admin',
-    mobileRole: null,
   },
 };
 
 // Chuyển user object trả về từ backend (auth.controller.js: register/login/getMe)
-// thành user object mà App.jsx / Navbar.jsx đang cần (name, roleLabel, defaultTab, mobileRole).
+// thành user object mà App.jsx / Navbar.jsx đang cần (name, roleLabel, defaultTab).
 export function buildUserFromBackend(backendUser) {
   const roleKey = (backendUser.role || 'FISHERMAN').toUpperCase();
   const meta = ROLE_META[roleKey] || ROLE_META.FISHERMAN;
@@ -45,6 +39,5 @@ export function buildUserFromBackend(backendUser) {
     role: roleKey,
     roleLabel: meta.label,
     defaultTab: meta.defaultTab,
-    mobileRole: meta.mobileRole,
   };
 }

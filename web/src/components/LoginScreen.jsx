@@ -84,11 +84,7 @@ export default function LoginScreen({ onLogin }) {
     <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
       <div className="w-full max-w-xl glass-panel stack-v">
         <div className="text-center space-y-2">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500 via-cyan-400 to-coral-400 p-[2px] shadow-lg shadow-sky-500/20 mx-auto">
-            <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
-              <Anchor className="w-8 h-8 text-sky-600" />
-            </div>
-          </div>
+          <img src="/logo.png" alt="" className="w-16 h-16 rounded-2xl shadow-lg shadow-sky-500/20 mx-auto" />
           <h1 className="font-display text-2xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-sky-600 via-cyan-600 to-coral-600">
             SeaTrade AI
           </h1>
