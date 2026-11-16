@@ -11,8 +11,6 @@ import { fetchConversations, startConversation } from '../api/chatApi';
 import ChatThread from '../components/ChatThread';
 import { useNotifications } from '../context/NotificationContext';
 import { API_URL } from '../config/api';
-import VnpayCheckoutModal from '../components/VnpayCheckoutModal';
-import { previewMessage } from '../utils/messagePreview';
 
 const STATUS_LABEL = {
   PENDING: 'Chờ xác nhận',
@@ -43,7 +41,6 @@ export default function HistoryScreen({ route, navigation }) {
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [myUserId, setMyUserId] = useState(null);
-  const [payingOrderId, setPayingOrderId] = useState(null);
 
   useEffect(() => {
     AsyncStorage.getItem('userData').then(raw => {
@@ -151,11 +148,6 @@ export default function HistoryScreen({ route, navigation }) {
     const formatVND = (n) => Number(n).toLocaleString('vi-VN') + 'đ';
 
     const counterpartyPhone = isBuyer ? item.seller?.phone : item.buyer?.phone;
-    const isBuyNow = item.purchase_type === 'BUY_NOW';
-    const holdExpired = item.hold_expires_at && new Date(item.hold_expires_at) <= new Date();
-    const holdUntil = item.hold_expires_at && !item.is_paid && !holdExpired
-      ? new Date(item.hold_expires_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-      : null;
 
     return (
       <TouchableOpacity
@@ -165,9 +157,7 @@ export default function HistoryScreen({ route, navigation }) {
       >
         <View style={styles.cardTop}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.species}>
-              {speciesName}{isBuyNow ? <Text style={styles.buyNowTag}>  ⚡ Mua ngay</Text> : null}
-            </Text>
+            <Text style={styles.species}>{speciesName}</Text>
             <Text style={styles.meta}>
               {isBuyer ? 'Mua từ' : 'Bán cho'}: {counterparty} • {firstItem?.quantity_kg}kg
             </Text>
@@ -187,36 +177,6 @@ export default function HistoryScreen({ route, navigation }) {
           <Text style={styles.totalLabel}>Tổng đơn:</Text>
           <Text style={styles.totalValue}>{formatVND(item.total_amount)}</Text>
         </View>
-        {!isCancelled && (
-          <View style={styles.paymentRow}>
-            {item.is_paid ? (
-              <View style={[styles.payBadge, styles.payBadgePaid]}>
-                <Ionicons name="shield-checkmark" size={13} color={colors.success} />
-                <Text style={[styles.payBadgeText, { color: colors.success }]}>Đã thanh toán</Text>
-              </View>
-            ) : (
-              <View style={[styles.payBadge, styles.payBadgeUnpaid]}>
-                <Ionicons name="time-outline" size={13} color="#d97706" />
-                <Text style={[styles.payBadgeText, { color: '#d97706' }]}>
-                  {holdUntil
-                    ? `Giữ hàng đến ${holdUntil}`
-                    : isBuyer ? 'Chưa thanh toán' : 'Chờ người mua thanh toán'}
-                </Text>
-              </View>
-            )}
-            {isBuyer && !item.is_paid && item.status === 'CONFIRMED' && !holdExpired && (
-              <TouchableOpacity
-                style={styles.payBtn}
-                onPress={() => setPayingOrderId(item.id)}
-                accessibilityRole="button"
-                accessibilityLabel="Thanh toán đơn hàng qua VNPay"
-              >
-                <Ionicons name="card" size={14} color="#fff" />
-                <Text style={styles.payBtnText}>Thanh toán VNPay</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
       </TouchableOpacity>
     );
   };
@@ -250,7 +210,7 @@ export default function HistoryScreen({ route, navigation }) {
             {peerName}
           </Text>
           <Text style={[styles.chatLastMessage, isUnread && styles.chatLastMessageUnread]} numberOfLines={1}>
-            {previewMessage(item.last_message)}
+            {item.last_message || 'Chưa có tin nhắn'}
           </Text>
         </View>
         <View style={styles.chatCardRight}>
@@ -293,6 +253,19 @@ export default function HistoryScreen({ route, navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Lịch Sử</Text>
+<<<<<<< HEAD
+  <TouchableOpacity
+    style={[styles.newChatBtn, { opacity: tab === 'CHAT' ? 1 : 0 }]}
+    onPress={() => tab === 'CHAT' && setNewChatModalVisible(true)}
+    disabled={tab !== 'CHAT'}
+=======
+        {/* QUAN TRỌNG: nút này LUÔN được render (kể cả ở tab Giao dịch), chỉ ẩn
+            bằng opacity:0 + disabled thay vì ẩn hẳn bằng điều kiện && như
+            trước. Lý do: ẩn hẳn bằng && làm header đổi chiều cao mỗi lần đổi
+            tab (có nút ở tab Chat cao hơn không có nút ở tab Giao dịch), khiến
+            cả thanh tab bar bên dưới bị nhảy/lệch vị trí theo mỗi lần chuyển
+            tab — đây chính là lỗi "lệch nhau khi chuyển tab" đã gặp. Giữ
+            nguyên chỗ đứng của nút thì chiều cao header luôn cố định. */}
         <TouchableOpacity
           style={[styles.newChatBtn, tab !== 'CHAT' && styles.newChatBtnHidden]}
           onPress={() => setNewChatModalVisible(true)}
@@ -301,13 +274,14 @@ export default function HistoryScreen({ route, navigation }) {
           importantForAccessibility={tab !== 'CHAT' ? 'no-hide-descendants' : 'yes'}
           accessibilityRole="button"
           accessibilityLabel="Nhắn tin mới"
-        >
-          <Ionicons name="add-circle" size={26} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
+>>>>>>> origin/main
+  >
+    <Ionicons name="add-circle" size={26} color={colors.primary} />
+  </TouchableOpacity>
+      </View >
 
-      {/* 2 tab con: Giao dịch / Chat */}
-      <View style={styles.tabBar}>
+    {/* 2 tab con: Giao dịch / Chat */ }
+    < View style = { styles.tabBar } >
         <TouchableOpacity
           style={[styles.tabBtn, tab === 'TRANSACTIONS' && styles.tabBtnActive]}
           onPress={() => setTab('TRANSACTIONS')}
@@ -331,115 +305,107 @@ export default function HistoryScreen({ route, navigation }) {
           </View>
           <Text style={[styles.tabBtnText, tab === 'CHAT' && styles.tabBtnTextActive]}>Chat</Text>
         </TouchableOpacity>
-      </View>
+      </View >
 
-      {tab === 'TRANSACTIONS' && (
-        loadingOrders ? (
-          <View style={styles.emptyContainer}>
-            <ActivityIndicator size="small" color={colors.primary} />
-          </View>
-        ) : orders.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="receipt-outline" size={48} color={colors.textFaint} />
-            <Text style={styles.emptyText}>Chưa có giao dịch nào.{"\n"}Thỏa thuận giá trong Chat để tạo đơn hàng!</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={orders}
-            keyExtractor={item => item.id}
-            renderItem={renderTransactionItem}
-            contentContainerStyle={styles.list}
-            refreshing={loadingOrders}
-            onRefresh={loadOrders}
-          />
-        )
-      )}
-
-      {payingOrderId && (
-        <VnpayCheckoutModal
-          visible
-          orderId={payingOrderId}
-          onDone={() => {
-            setPayingOrderId(null);
-            loadOrders();
-          }}
-        />
-      )}
-
-      {tab === 'CHAT' && (
-        loadingConversations ? (
-          <View style={styles.emptyContainer}>
-            <ActivityIndicator size="small" color={colors.primary} />
-          </View>
-        ) : conversationsError ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="warning-outline" size={40} color={colors.danger} />
-            <Text style={styles.errorText}>{conversationsError}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => loadConversations()} accessibilityRole="button" accessibilityLabel="Thử tải lại danh sách hội thoại">
-              <Text style={styles.retryBtnText}>Thử lại</Text>
-            </TouchableOpacity>
-          </View>
-        ) : conversations.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={48} color={colors.textFaint} />
-            <Text style={styles.emptyText}>Chưa có cuộc trò chuyện nào.</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => setNewChatModalVisible(true)} accessibilityRole="button" accessibilityLabel="Bắt đầu nhắn tin mới">
-              <Text style={styles.retryBtnText}>+ Nhắn tin mới</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <FlatList
-            data={conversations}
-            keyExtractor={item => item.id}
-            renderItem={renderConversationItem}
-            contentContainerStyle={styles.list}
-            refreshing={loadingConversations}
-            onRefresh={loadConversations}
-          />
-        )
-      )}
-
-      <Modal
-        visible={newChatModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setNewChatModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Nhắn tin mới</Text>
-            <Text style={styles.modalSub}>Nhập số điện thoại người bạn muốn nhắn tin</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="VD: 0912345678"
-              keyboardType="phone-pad"
-              value={peerPhoneInput}
-              onChangeText={setPeerPhoneInput}
-              autoFocus
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnCancel]}
-                onPress={() => { setNewChatModalVisible(false); setPeerPhoneInput(''); }}
-              >
-                <Text style={styles.modalBtnCancelText}>Hủy</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnPrimary, (!peerPhoneInput.trim() || startingChat) && styles.modalBtnDisabled]}
-                onPress={handleStartChat}
-                disabled={!peerPhoneInput.trim() || startingChat}
-              >
-                {startingChat ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.modalBtnPrimaryText}>Bắt đầu</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
+    { tab === 'TRANSACTIONS' && (
+      loadingOrders ? (
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="small" color={colors.primary} />
         </View>
-      </Modal>
-    </SafeAreaView>
+      ) : orders.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="receipt-outline" size={48} color={colors.textFaint} />
+          <Text style={styles.emptyText}>Chưa có giao dịch nào.{"\n"}Thỏa thuận giá trong Chat để tạo đơn hàng!</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={orders}
+          keyExtractor={item => item.id}
+          renderItem={renderTransactionItem}
+          contentContainerStyle={styles.list}
+          refreshing={loadingOrders}
+          onRefresh={loadOrders}
+        />
+      )
+    )
+}
+
+{
+  tab === 'CHAT' && (
+    loadingConversations ? (
+      <View style={styles.emptyContainer}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    ) : conversationsError ? (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="warning-outline" size={40} color={colors.danger} />
+        <Text style={styles.errorText}>{conversationsError}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={() => loadConversations()} accessibilityRole="button" accessibilityLabel="Thử tải lại danh sách hội thoại">
+          <Text style={styles.retryBtnText}>Thử lại</Text>
+        </TouchableOpacity>
+      </View>
+    ) : conversations.length === 0 ? (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="chatbubbles-outline" size={48} color={colors.textFaint} />
+        <Text style={styles.emptyText}>Chưa có cuộc trò chuyện nào.</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={() => setNewChatModalVisible(true)} accessibilityRole="button" accessibilityLabel="Bắt đầu nhắn tin mới">
+          <Text style={styles.retryBtnText}>+ Nhắn tin mới</Text>
+        </TouchableOpacity>
+      </View>
+    ) : (
+      <FlatList
+        data={conversations}
+        keyExtractor={item => item.id}
+        renderItem={renderConversationItem}
+        contentContainerStyle={styles.list}
+        refreshing={loadingConversations}
+        onRefresh={loadConversations}
+      />
+    )
+  )
+}
+
+<Modal
+  visible={newChatModalVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setNewChatModalVisible(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalBox}>
+      <Text style={styles.modalTitle}>Nhắn tin mới</Text>
+      <Text style={styles.modalSub}>Nhập số điện thoại người bạn muốn nhắn tin</Text>
+      <TextInput
+        style={styles.modalInput}
+        placeholder="VD: 0912345678"
+        keyboardType="phone-pad"
+        value={peerPhoneInput}
+        onChangeText={setPeerPhoneInput}
+        autoFocus
+      />
+      <View style={styles.modalActions}>
+        <TouchableOpacity
+          style={[styles.modalBtn, styles.modalBtnCancel]}
+          onPress={() => { setNewChatModalVisible(false); setPeerPhoneInput(''); }}
+        >
+          <Text style={styles.modalBtnCancelText}>Hủy</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modalBtn, styles.modalBtnPrimary, (!peerPhoneInput.trim() || startingChat) && styles.modalBtnDisabled]}
+          onPress={handleStartChat}
+          disabled={!peerPhoneInput.trim() || startingChat}
+        >
+          {startingChat ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.modalBtnPrimaryText}>Bắt đầu</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+    </SafeAreaView >
   );
 }
 
@@ -534,20 +500,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 2,
   },
-  buyNowTag: { fontSize: 11, fontWeight: '700', color: colors.primary },
-  paymentRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border, gap: 8,
-  },
-  payBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  payBadgePaid: { backgroundColor: '#dcfce7' },
-  payBadgeUnpaid: { backgroundColor: '#fef3c7' },
-  payBadgeText: { fontSize: 11, fontWeight: '700' },
-  payBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8,
-  },
-  payBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,

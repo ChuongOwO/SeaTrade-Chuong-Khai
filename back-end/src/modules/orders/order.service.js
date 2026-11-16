@@ -85,6 +85,27 @@ const getOrdersByUser = async (userId) => {
        o.id, o.total_amount, o.status, o.created_at, o.note, o.accepted_offer_id,
        o.purchase_type, o.hold_expires_at,
        EXISTS (SELECT 1 FROM payments p WHERE p.order_id = o.id AND p.status = 'PAID') AS is_paid,
+       (
+         SELECT json_build_object(
+           'id', p.id,
+           'amount', p.amount,
+           'payment_method', p.payment_method,
+           'status', p.status,
+           'transaction_code', p.transaction_code,
+           'gateway_txn_no', p.gateway_txn_no,
+           'bank_code', p.bank_code,
+           'response_code', p.response_code,
+           'txn_status', p.txn_status,
+           'vnp_create_date', p.vnp_create_date,
+           'paid_at', p.paid_at,
+           'seller_confirmed_at', p.seller_confirmed_at,
+           'created_at', p.created_at
+         )
+         FROM payments p
+         WHERE p.order_id = o.id
+         ORDER BY (p.status = 'PAID') DESC, p.created_at DESC
+         LIMIT 1
+       ) AS payment,
        json_build_object('id', buyer.id, 'full_name', buyer.full_name, 'phone', buyer.phone) AS buyer,
        json_build_object('id', seller.id, 'full_name', seller.full_name, 'phone', seller.phone) AS seller,
        json_agg(json_build_object(

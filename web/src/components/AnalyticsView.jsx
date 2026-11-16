@@ -4,7 +4,9 @@ import {
   CalendarRange,
   Users,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Calendar,
+  Filter
 } from 'lucide-react';
 import { fetchAdminStats } from '../api/admin';
 
@@ -23,6 +25,14 @@ const ORDER_STATUS_LABELS = {
   CANCELLED: 'Đã hủy',
   REJECTED: 'Bị từ chối'
 };
+
+const PERIOD_OPTIONS = [
+  { value: 'all', label: 'Toàn bộ thời gian' },
+  { value: 'today', label: 'Hôm nay' },
+  { value: '7days', label: '7 ngày qua' },
+  { value: '30days', label: '30 ngày qua' },
+  { value: 'custom', label: 'Tùy chọn ngày...' }
+];
 
 const formatVnd = (value) => Number(value).toLocaleString('vi-VN');
 const sumValues = (obj = {}) => Object.values(obj).reduce((sum, n) => sum + n, 0);
@@ -69,39 +79,127 @@ export default function AnalyticsView() {
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [period, setPeriod] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
-  const loadStats = async () => {
+  const loadStats = async (overrideParams = {}) => {
     setIsLoading(true);
     setLoadError('');
     try {
-      setStats(await fetchAdminStats());
+      const activePeriod = overrideParams.period !== undefined ? overrideParams.period : period;
+      const activeStart = overrideParams.startDate !== undefined ? overrideParams.startDate : startDate;
+      const activeEnd = overrideParams.endDate !== undefined ? overrideParams.endDate : endDate;
+
+      const params = {};
+      if (activePeriod !== 'custom') {
+        params.period = activePeriod;
+      } else {
+        if (activeStart) params.startDate = activeStart;
+        if (activeEnd) params.endDate = activeEnd;
+      }
+
+      setStats(await fetchAdminStats(params));
     } catch (err) {
-      setLoadError(err.message);
+      setLoadError(err.message || 'Lỗi khi tải số liệu thống kê');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadStats();
-  }, []);
+    if (period !== 'custom') {
+      loadStats({ period });
+    }
+  }, [period]);
+
+  const handleApplyCustomDate = (e) => {
+    e.preventDefault();
+    if (!startDate && !endDate) return;
+    loadStats({ period: 'custom', startDate, endDate });
+  };
 
   const totalVolumeKg = (stats?.species_volume || []).reduce((sum, row) => sum + row.total_kg, 0);
   const speciesRows = (stats?.species_volume || []).map(row => ({ label: row.species, value: row.total_kg }));
   const monthlyRows = (stats?.monthly_orders || []).map(row => ({ label: row.month, value: row.total_value }));
 
-  return (
-    <div className="page-section">
+  const isDailyTrend = period === 'today' || period === '7days';
 
-      <div className="page-header page-header-row">
+  return (
+    <div className="page-section space-y-6">
+
+      <div className="page-header page-header-row flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="page-header-title">Thống Kê & Hiệu Quả Giao Thương</h2>
-          <p className="page-header-desc">Sản lượng, doanh thu và cơ cấu giao dịch tổng hợp từ dữ liệu thực tế trên hệ thống.</p>
+          <p className="page-header-desc">
+            Sản lượng, doanh thu và cơ cấu giao dịch tổng hợp từ dữ liệu thực tế trên hệ thống.
+          </p>
         </div>
-        <button type="button" onClick={loadStats} className="btn btn-outline shrink-0" disabled={isLoading}>
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /> Tải lại
-        </button>
+
+        {/* Thanh công cụ lọc thời gian */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-medium">
+            {PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setPeriod(opt.value)}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  period === opt.value
+                    ? 'bg-white text-slate-900 shadow-sm font-semibold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => loadStats()}
+            className="btn btn-outline btn-sm shrink-0"
+            disabled={isLoading}
+            title="Làm mới số liệu"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
+
+      {/* Form tùy chọn ngày khi chọn custom */}
+      {period === 'custom' && (
+        <form
+          onSubmit={handleApplyCustomDate}
+          className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-wrap items-center gap-3 text-xs"
+        >
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-sky-600" />
+            <span className="font-bold text-slate-700">Lọc khoảng ngày:</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-slate-500">Từ:</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="input-base text-xs py-1 px-2.5 rounded-lg"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-slate-500">Đến:</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="input-base text-xs py-1 px-2.5 rounded-lg"
+            />
+          </div>
+          <button type="submit" className="btn btn-primary btn-sm ml-auto">
+            Áp dụng
+          </button>
+        </form>
+      )}
 
       {loadError && (
         <div className="info-box text-rose-700 bg-rose-50 border border-rose-200 flex items-center gap-2" role="alert">
@@ -113,23 +211,30 @@ export default function AnalyticsView() {
         <div className="stat-card">
           <span className="stat-label">Tổng Giá Trị Giao Dịch</span>
           <div className="stat-value text-emerald-600">
-            {((stats?.orders.total_value || 0) / 1_000_000).toFixed(1)} <span className="text-base font-semibold text-slate-500">Triệu VNĐ</span>
+            {((stats?.orders.total_value || 0) / 1_000_000).toFixed(1)}{' '}
+            <span className="text-base font-semibold text-slate-500">Triệu VNĐ</span>
           </div>
-          <p className="text-sm text-slate-500 mt-3">{stats?.orders.order_count || 0} đơn (không tính đơn hủy / bị từ chối)</p>
+          <p className="text-sm text-slate-500 mt-3">
+            {stats?.orders.order_count || 0} đơn (không tính đơn hủy / từ chối)
+          </p>
         </div>
 
         <div className="stat-card">
           <span className="stat-label">Tổng Sản Lượng Khai Thác</span>
           <div className="stat-value text-sky-600">
-            {(totalVolumeKg / 1000).toFixed(2)} <span className="text-base font-semibold text-slate-500">Tấn</span>
+            {(totalVolumeKg / 1000).toFixed(2)}{' '}
+            <span className="text-base font-semibold text-slate-500">Tấn</span>
           </div>
-          <p className="text-sm text-slate-500 mt-3">{sumValues(stats?.batches.by_status)} mẻ hải sản đã ghi nhận</p>
+          <p className="text-sm text-slate-500 mt-3">
+            {sumValues(stats?.batches.by_status)} mẻ hải sản trong kỳ
+          </p>
         </div>
 
         <div className="stat-card">
           <span className="stat-label">Người Dùng & Tàu</span>
           <div className="stat-value text-amber-600">
-            {sumValues(stats?.users.by_role)} <span className="text-base font-semibold text-slate-500">tài khoản</span>
+            {sumValues(stats?.users.by_role)}{' '}
+            <span className="text-base font-semibold text-slate-500">tài khoản</span>
           </div>
           <p className="text-sm text-slate-500 mt-3">
             {stats?.vessels.by_status.ACTIVE || 0} / {sumValues(stats?.vessels.by_status)} tàu đang hoạt động
@@ -147,20 +252,21 @@ export default function AnalyticsView() {
           <HorizontalBars
             rows={speciesRows}
             formatValue={(kg) => `${formatVnd(kg)} kg`}
-            emptyText="Chưa có mẻ hải sản nào để thống kê."
+            emptyText="Chưa có mẻ hải sản nào trong khoảng thời gian này."
           />
         </div>
 
         <div className="glass-panel stack-v">
           <div className="section-divider">
             <h3 className="section-title">
-              <CalendarRange className="w-5 h-5 text-emerald-600" /> Giá Trị Giao Dịch 6 Tháng Gần Nhất
+              <CalendarRange className="w-5 h-5 text-emerald-600" />
+              {isDailyTrend ? ' Xu Hướng Giao Dịch Theo Ngày' : ' Xu Hướng Giao Dịch Theo Tháng'}
             </h3>
           </div>
           <HorizontalBars
             rows={monthlyRows}
             formatValue={(vnd) => `${(vnd / 1_000_000).toFixed(1)} Tr VNĐ`}
-            emptyText="Chưa có giao dịch trong 6 tháng gần đây."
+            emptyText="Chưa có giao dịch trong khoảng thời gian đã chọn."
           />
         </div>
       </div>

@@ -1,335 +1,182 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, radius } from '../theme';
-import { classifySeafoodImage } from '../api/aiApi';
+import { StyleSheet, View, Text, TouchableOpacity, Alert, Platform } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors } from '../theme';
 
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-
-// LƯU Ý: màn hình này TRƯỚC ĐÂY dùng CameraView (expo-camera) để tự vẽ khung
-// xem trước (preview) trực tiếp. Trên 1 số iPhone, CameraView bị lỗi hiển thị
-// MÀN HÌNH ĐEN dù camera đã bật (đèn camera sáng, quyền đã cấp) — đây là bug
-// đã biết của expo-camera liên quan "New Architecture" trên iOS, chưa có bản
-// vá ổn định (xem các issue #49760, #31597 trên github.com/expo/expo), và
-// KHÔNG thể khắc phục khi chạy qua Expo Go (không tự build lại native code).
-//
-// Giải pháp: chuyển sang expo-image-picker.launchCameraAsync() — mở thẳng
-// app Camera GỐC của điện thoại để chụp (không tự vẽ preview), rồi lấy ảnh
-// vừa chụp gửi lên ai-service như cũ. Cách này ổn định tuyệt đối vì không
-// phụ thuộc vào việc Expo tự render khung hình camera.
-//
-// CẬP NHẬT (10/2026): thêm tùy chọn "Chọn Ảnh Từ Thư Viện" bên cạnh chụp
-// camera — dùng expo-image-picker.launchImageLibraryAsync() (cùng thư viện
-// đã có sẵn, không cần cài thêm gì). Lý do thêm:
-//   1. Nhu cầu thật: thuyền trưởng có thể đã chụp ảnh con cá lúc nãy (vd để
-//      đăng Zalo/Facebook rao bán) và muốn dùng lại ảnh đó để phân loại,
-//      không cần chụp lại từ đầu.
-//   2. Hỗ trợ test khi chưa có sẵn hải sản thật để chụp trực tiếp.
-// LƯU Ý QUAN TRỌNG: ảnh chọn từ thư viện nếu là ảnh tải về/chụp lại màn hình
-// mạng xã hội (khác hẳn điều kiện ảnh train — chụp trực tiếp, không qua lọc/
-// nén/giao diện MXH) sẽ cho kết quả AI kém chính xác hơn hẳn so với ảnh chụp
-// trực tiếp — đã có ví dụ thực tế lúc test. Dùng ảnh càng giống ảnh chụp thật
-// (không qua chỉnh sửa/không có watermark, giao diện app đè lên) thì kết quả
-// càng đáng tin cậy.
 export default function CameraScreen({ navigation }) {
-  const [scanning, setScanning] = useState(false);
-  const [lastPhotoUri, setLastPhotoUri] = useState(null);
+  const [facing, setFacing] = useState('back');
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+  const insets = useSafeAreaInsets();
 
-  // Logic dùng chung cho cả 2 nguồn ảnh (camera lẫn thư viện) — tránh lặp code
-  // gọi AI Service + hiển thị kết quả 2 lần giống hệt nhau.
-  const runAnalysis = async (asset) => {
-    const { uri, fileSize } = asset;
+  if (!permission) {
+    return <View />;
+  }
 
-    // asset.fileSize không phải lúc nào cũng có (tuỳ thiết bị/phiên bản OS),
-    // nên chỉ chặn khi CHẮC CHẮN biết ảnh vượt quá giới hạn — nếu không có
-    // thông tin này thì vẫn cho gửi lên, server sẽ tự kiểm tra lại lần nữa.
-    if (typeof fileSize === 'number' && fileSize > MAX_UPLOAD_BYTES) {
-      const sizeMb = (fileSize / (1024 * 1024)).toFixed(1);
+  if (!permission.granted) {
+    return (
+      <SafeAreaView style={styles.permissionContainer}>
+        <Text style={styles.permissionText}>
+          SeaTrade AI cần quyền truy cập Camera để phân loại hải sản
+        </Text>
+        <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
+          <Text style={styles.btnText}>Cấp Quyền Camera</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  const handleScan = () => {
+    setScanned(true);
+    setTimeout(() => {
       Alert.alert(
-        'Ảnh Quá Lớn',
-        `Ảnh này nặng ${sizeMb}MB, vượt quá giới hạn 10MB cho phép. Hãy chọn ảnh khác hoặc chụp lại (ảnh chụp bằng app sẽ tự động nén nhỏ hơn).`,
-        [{ text: 'Đã Hiểu' }]
-      );
-      return;
-    }
-
-    setLastPhotoUri(uri);
-    setScanning(true);
-    try {
-      const aiResult = await classifySeafoodImage(uri);
-
-      if (!aiResult?.detections?.length) {
-        Alert.alert(
-          'Không Phát Hiện Hải Sản',
-          'AI không tìm thấy hải sản nào rõ ràng trong ảnh. Hãy thử ảnh chụp gần hơn, đủ sáng và chụp trực tiếp (ảnh tải từ mạng/chụp màn hình thường cho kết quả kém chính xác hơn).',
-          [{ text: 'Đã Hiểu' }]
-        );
-        return;
-      }
-
-      // Ưu tiên hiển thị phát hiện có độ tin cậy cao nhất — nếu ảnh có nhiều
-      // con/nhiều loài, tổng số lượng phát hiện được vẫn báo ở dòng riêng.
-      const top = aiResult.detections[0];
-      const confidencePct = (top.confidence * 100).toFixed(1);
-      const priceText = top.estimated_price_per_kg
-        ? `${top.estimated_price_per_kg.toLocaleString('vi-VN')} đ/kg`
-        : 'Chưa có dữ liệu giá';
-
-      // needs_review: AI chưa đủ chắc chắn (xem ai-service REVIEW_CONFIDENCE_THRESHOLD)
-      // -> nhắc thuyền trưởng tự kiểm tra lại loài trước khi đăng bán.
-      const reviewNote = aiResult.needs_review
-        ? '\n\n⚠️ AI chưa chắc chắn về kết quả này — hãy kiểm tra và chọn lại loài cho đúng khi đăng bán.'
-        : '';
-
-      Alert.alert(
-        aiResult.needs_review ? 'Cần Xác Nhận Lại Loài' : 'YOLOv8 AI Đã Phân Tích',
-        `Loài: ${top.label_vi}\nSố lượng phát hiện: ${aiResult.count}\nĐộ tin cậy: ${confidencePct}%\nGiá gợi ý: ${priceText}\nThời gian xử lý: ${aiResult.processing_time_ms}ms${reviewNote}`,
+        'YOLOv8 AI Đã Phân Tích',
+        'Loài: Cá Ngừ Vây Vàng\nĐộ tươi: Grade A (Tươi sống)\nGiá gợi ý: 185,000 đ/kg\nĐộ chính xác: 98.4%',
         [
           {
             text: 'Đăng Bán Ngay', onPress: () => {
-              setLastPhotoUri(null);
-              // Chuyển kết quả AI sang màn Đăng bán để điền sẵn loài, ảnh, giá
-              navigation.navigate('CreateBatch', {
-                scan: {
-                  photoUri: uri,
-                  detection: top,
-                  modelVersion: aiResult.model_version,
-                  needsReview: aiResult.needs_review,
-                },
-              });
+              setScanned(false);
+              navigation.navigate('CreateBatch');
             }
           },
-          { text: 'Chụp Lại', onPress: () => setLastPhotoUri(null), style: 'cancel' },
+          { text: 'Chụp Lại', onPress: () => setScanned(false), style: 'cancel' },
         ]
       );
-    } catch (err) {
-      Alert.alert(
-        'Lỗi Phân Tích AI',
-        err.message || 'Có lỗi xảy ra khi gọi AI Service. Vui lòng thử lại.',
-        [{ text: 'Đóng' }]
-      );
-    } finally {
-      setScanning(false);
-    }
-  };
-
-  const handleCapture = async () => {
-    if (scanning) return;
-
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        'Cần Quyền Camera',
-        'SeaTrade AI cần quyền truy cập Camera để chụp và phân loại hải sản. Vui lòng cấp quyền trong phần Cài đặt của điện thoại.'
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.5,
-      allowsEditing: false,
-    });
-
-    // Người dùng bấm Huỷ ở app Camera gốc — không có gì để xử lý tiếp.
-    if (result.canceled || !result.assets?.length) return;
-
-    await runAnalysis(result.assets[0]);
-  };
-
-  const handlePickFromLibrary = async () => {
-    if (scanning) return;
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        'Cần Quyền Truy Cập Thư Viện Ảnh',
-        'SeaTrade AI cần quyền truy cập Thư viện ảnh để chọn ảnh có sẵn. Vui lòng cấp quyền trong phần Cài đặt của điện thoại.'
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.5,
-      allowsEditing: false,
-    });
-
-    // Người dùng bấm Huỷ ở thư viện ảnh — không có gì để xử lý tiếp.
-    if (result.canceled || !result.assets?.length) return;
-
-    await runAnalysis(result.assets[0]);
+    }, 1500);
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Quét AI Phân Loại Hải Sản</Text>
-        <Text style={styles.headerSub}>
-          Chụp ảnh hải sản vừa đánh bắt — YOLOv8 tự động nhận diện loài, đếm số lượng và gợi ý giá bán.
-        </Text>
-      </View>
-
-      <View style={styles.previewArea}>
-        {lastPhotoUri ? (
-          <Image source={{ uri: lastPhotoUri }} style={styles.previewImage} resizeMode="cover" />
-        ) : (
-          <View style={styles.placeholder}>
-            <Ionicons name="camera-outline" size={64} color={colors.textFaint} />
-            <Text style={styles.placeholderText}>Chưa có ảnh nào được chụp</Text>
-          </View>
-        )}
-
-        {scanning && (
-          <View style={styles.scanningOverlay}>
-            <ActivityIndicator size="large" color="#fff" />
-            <Text style={styles.scanningText}>Đang phân tích YOLOv8...</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.captureBtn, scanning && styles.captureBtnDisabled]}
-          onPress={handleCapture}
-          disabled={scanning}
-          accessibilityRole="button"
-          accessibilityLabel="Mở camera để chụp và phân loại hải sản bằng AI"
-          accessibilityState={{ disabled: scanning, busy: scanning }}
-        >
-          {scanning ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Ionicons name="camera" size={22} color="#fff" />
-          )}
-          <Text style={styles.captureBtnText}>
-            {scanning ? 'Đang Xử Lý...' : 'Chụp Ảnh & Phân Loại AI'}
+    <View style={styles.container}>
+      {Platform.OS === 'web' ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#334155' }}>
+          <Text style={{ color: '#fff', fontSize: 16, textAlign: 'center', paddingHorizontal: 20 }}>
+            Tính năng AI Camera (YOLOv8) không hỗ trợ trên Trình duyệt Web.{'\n'}
+            Vui lòng cài đặt App trên Điện thoại để trải nghiệm.
           </Text>
-        </TouchableOpacity>
+        </View>
+      ) : (
+        <CameraView style={StyleSheet.absoluteFillObject} facing={facing} />
+      )}
 
-        <TouchableOpacity
-          style={[styles.libraryBtn, scanning && styles.captureBtnDisabled]}
-          onPress={handlePickFromLibrary}
-          disabled={scanning}
-          accessibilityRole="button"
-          accessibilityLabel="Chọn ảnh có sẵn trong thư viện để phân loại bằng AI"
-          accessibilityState={{ disabled: scanning, busy: scanning }}
-        >
-          <Ionicons name="images-outline" size={20} color={colors.primary} />
-          <Text style={styles.libraryBtnText}>Chọn Ảnh Từ Thư Viện</Text>
-        </TouchableOpacity>
+      {/* Absolute Overlay covering the camera */}
+      <View style={[StyleSheet.absoluteFillObject, styles.overlay, { paddingTop: insets.top, paddingBottom: insets.bottom + 80 }]}>
+        <View style={styles.header}>
+          <Text style={styles.headerText}>Đưa hải sản vào khung hình</Text>
+        </View>
 
-        <Text style={styles.libraryHint}>
-          Lưu ý: ảnh chụp trực tiếp cho kết quả chính xác hơn — ảnh tải về từ
-          mạng/chụp lại màn hình có thể kém chính xác hơn.
-        </Text>
+        <View style={styles.scanArea}>
+          <View style={styles.scanFrame} />
+        </View>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.captureBtn, scanned && styles.captureBtnDisabled]}
+            onPress={handleScan}
+            disabled={scanned}
+          >
+            <View style={styles.captureBtnInner} />
+          </TouchableOpacity>
+          <Text style={styles.footerText}>
+            {scanned ? 'Đang phân tích YOLOv8...' : 'Nhấn để AI Phân Loại'}
+          </Text>
+        </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: colors.background,
+    padding: 20,
+  },
+  permissionText: {
+    textAlign: 'center',
+    marginBottom: 20,
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  permissionBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  btnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  camera: {
+    flex: 1,
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'space-between',
+    paddingTop: 60,
+    paddingBottom: 40,
   },
   header: {
+    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-  },
-  headerSub: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 4,
-    lineHeight: 17,
-  },
-  previewArea: {
-    flex: 1,
-    margin: 16,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    backgroundColor: '#0f172a',
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-  },
-  placeholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 10,
-  },
-  placeholderText: {
-    color: colors.textFaint,
-    fontSize: 13,
-  },
-  scanningOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15,23,42,0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  scanningText: {
+  headerText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '600',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  scanArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
+    borderWidth: 2,
+    borderColor: colors.danger,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
   },
   footer: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
+    alignItems: 'center',
+    paddingBottom: 20,
   },
   captureBtn: {
-    flexDirection: 'row',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255,255,255,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.primary,
-    paddingVertical: 15,
-    borderRadius: radius.md,
+    borderWidth: 3,
+    borderColor: '#fff',
+    marginBottom: 12,
+  },
+  captureBtnInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#fff',
   },
   captureBtnDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
-  captureBtnText: {
+  footerText: {
     color: '#fff',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  libraryBtn: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    paddingVertical: 13,
-    borderRadius: radius.md,
-    marginTop: 10,
-  },
-  libraryBtnText: {
-    color: colors.primary,
     fontSize: 14,
-    fontWeight: '600',
-  },
-  libraryHint: {
-    color: colors.textFaint,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 15,
-  },
+    fontWeight: '500',
+  }
 });

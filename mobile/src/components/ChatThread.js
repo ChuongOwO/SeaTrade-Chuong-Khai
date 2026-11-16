@@ -14,10 +14,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../theme';
 import { fetchMessages, sendMessage } from '../api/chatApi';
 import { API_URL } from '../config/api';
-import OrderPaymentPanel from './OrderPaymentPanel';
 
 const POLL_INTERVAL_MS = 15000; // Giảm tải vì đã có Socket.io
 
+<<<<<<< HEAD
 function parseMessageContent(raw) {
   if (!raw) return { type: 'text', data: '' };
   try {
@@ -27,27 +27,29 @@ function parseMessageContent(raw) {
     if (parsed.__type === 'PRICE_OFFER') return { type: 'price_offer', data: parsed };
     if (parsed.__type === 'OFFER_ACCEPTED') return { type: 'offer_accepted', data: parsed };
     if (parsed.__type === 'OFFER_REJECTED') return { type: 'offer_rejected', data: parsed };
-    if (parsed.__type === 'PAYMENT_SUCCESS') return { type: 'payment_success', data: parsed };
-    if (parsed.__type === 'PAYMENT_RECEIVED') return { type: 'payment_received', data: parsed };
-    if (parsed.__type === 'BUY_NOW_ORDER') return { type: 'buy_now_order', data: parsed };
     return { type: 'text', data: raw };
   } catch {
     return { type: 'text', data: raw };
   }
 }
 
-export const negotiationKey = (conversationId) => `negotiation_context_${conversationId}`;
-
 function formatVND(n) {
   return Number(n).toLocaleString('vi-VN') + 'đ';
 }
 
+export default function ChatThread({ conversation, onBack, targetOfferId }) {
+=======
 function formatMessageTime(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function ChatThread({ conversation, onBack, targetOfferId }) {
+// Khung 1 cuộc trò chuyện — back-end chưa có WebSocket cho chat (chỉ có
+// socket.io-client dùng cho radar GPS, xem App.js) nên dùng REST polling mỗi
+// 5s để tạo cảm giác gần-realtime. Khi có server chat realtime thật, chỉ cần
+// thay effect polling này bằng lắng nghe socket event.
+export default function ChatThread({ conversation, onBack }) {
+>>>>>>> origin/main
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
@@ -71,17 +73,14 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
         try { setMyUserId(JSON.parse(raw).id); } catch { }
       }
     });
-    // Mẻ cá đang thương lượng trong hội thoại này (lưu riêng từng hội thoại khi bấm "Thương lượng"
-    // ở Chợ). Đọc thêm key cũ 'negotiation_context' cho dữ liệu lưu trước bản cập nhật.
-    AsyncStorage.multiGet([negotiationKey(conversation.id), 'negotiation_context']).then((pairs) => {
-      for (const [, raw] of pairs) {
-        if (!raw) continue;
+    // Đọc negotiation context (nếu đến từ MarketScreen)
+    AsyncStorage.getItem('negotiation_context').then((raw) => {
+      if (raw) {
         try {
           const ctx = JSON.parse(raw);
           if (ctx.conversation_id === conversation.id) {
             setNegotiation(ctx);
             setQtyInput(String(ctx.quantity_kg || ''));
-            return;
           }
         } catch { }
       }
@@ -222,6 +221,16 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
     }
   };
 
+  const openLocationInMap = (lat, lng) => {
+    const url = Platform.select({
+      ios: `maps:0,0?q=${lat},${lng}`,
+      android: `geo:${lat},${lng}?q=${lat},${lng}`,
+    });
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(`https://www.google.com/maps?q=${lat},${lng}`);
+    });
+  };
+
   // === Đề xuất giá ===
   const handleSubmitOffer = async () => {
     const price = parseFloat(priceInput);
@@ -344,20 +353,13 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
 
   const peerName = conversation.peer?.full_name || conversation.peer?.phone || 'Người dùng';
 
-  // Thanh thương lượng: chỉ cho người mua, ẩn khi mẻ cá đã chốt đơn (chấp nhận đề xuất / Mua ngay)
-  // sau thời điểm bắt đầu thương lượng.
-  const dealClosed = negotiation && messages.some((m) => {
-    const { type } = parseMessageContent(m.message);
-    if (type !== 'offer_accepted' && type !== 'buy_now_order') return false;
-    return !negotiation.saved_at || new Date(m.created_at) >= new Date(negotiation.saved_at);
-  });
-  const showDealBar = Boolean(negotiation && myUserId && negotiation.seller_id !== myUserId && !dealClosed);
-
   // === Render bong bóng ===
   const renderBubble = (item) => {
     const isMine = item.sender_id === myUserId;
     const { type, data } = parseMessageContent(item.message);
-    const timeStr = formatMessageTime(item.created_at);
+    const timeStr = item.created_at
+      ? new Date(item.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+      : '';
 
     if (type === 'image') {
       const imageSource = data.base64 || data.uri;
@@ -410,6 +412,7 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
               <TouchableOpacity
                 style={styles.mapOverlay}
                 onPress={() => {
+                  // Chuyển sang Tab Home kèm toạ độ mục tiêu
                   navigation.navigate('Home', { targetLocation: { latitude: data.latitude, longitude: data.longitude } });
                 }}
               >
@@ -448,6 +451,7 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
               <Text style={styles.offerTotalLabel}>Tổng:</Text>
               <Text style={styles.offerTotal}>{formatVND(data.total)}</Text>
             </View>
+            {/* Nút Accept/Reject/Counter chỉ hiện cho người NHẬN offer và khi PENDING */}
             {!isMyOffer && isPending && (
               <View style={styles.offerActions}>
                 <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAcceptOffer(data.offer_id)}>
@@ -485,48 +489,6 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
             ✅ Đã chốt đơn! {data.species_name} — {formatVND(data.price_per_kg)}/kg × {data.quantity_kg}kg = {formatVND(data.total)}
           </Text>
           <Text style={styles.systemSubText}>Đơn hàng đã được tạo. Xem tại tab Giao dịch.</Text>
-          {data.order_id ? <OrderPaymentPanel orderId={data.order_id} refreshKey={messages.length} /> : null}
-        </View>
-      );
-    }
-
-    // === MUA NGAY (người mua bấm Mua ngay trên chợ) ===
-    if (type === 'buy_now_order') {
-      return (
-        <View style={styles.systemBubble}>
-          <Ionicons name="flash" size={26} color={colors.primary} />
-          <Text style={styles.systemText}>
-            ⚡ Mua ngay cả mẻ! {data.species_name || 'Hải sản'} — {formatVND(data.price_per_kg)}/kg × {data.quantity_kg}kg = {formatVND(data.total)}
-          </Text>
-          <Text style={styles.systemSubText}>Mẻ cá đang được giữ chờ người mua thanh toán qua VNPay.</Text>
-          {data.order_id ? <OrderPaymentPanel orderId={data.order_id} refreshKey={messages.length} /> : null}
-        </View>
-      );
-    }
-
-    // === NGƯỜI BÁN XÁC NHẬN ĐÃ NHẬN TIỀN (bằng chứng cho cả 2 bên) ===
-    if (type === 'payment_received') {
-      const methodText = { CASH: 'tiền mặt', BANK_TRANSFER: 'chuyển khoản', VNPAY: 'qua VNPay' }[data.method] || 'chuyển khoản';
-      return (
-        <View style={styles.systemBubble}>
-          <Ionicons name="cash" size={24} color={colors.success} />
-          <Text style={styles.systemText}>
-            💵 Người bán xác nhận đã nhận {formatVND(data.amount)} ({methodText})
-          </Text>
-          <Text style={styles.systemSubText}>Xác nhận lúc {formatMessageTime(item.created_at)} — lưu làm bằng chứng giao dịch.</Text>
-        </View>
-      );
-    }
-
-    // === PAYMENT SUCCESS (back-end gửi khi VNPay xác nhận) ===
-    if (type === 'payment_success') {
-      return (
-        <View style={styles.systemBubble}>
-          <Ionicons name="card" size={24} color={colors.success} />
-          <Text style={styles.systemText}>
-            💳 Người mua đã thanh toán {formatVND(data.amount)} qua VNPay
-          </Text>
-          <Text style={styles.systemSubText}>Người bán có thể chuẩn bị giao hàng.</Text>
         </View>
       );
     }
@@ -543,24 +505,12 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
       );
     }
 
-    // Text thường (kết hợp hỗ trợ tick xem tin nhắn)
+    // Text thường
     return (
       <View style={[styles.bubbleRow, isMine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
         <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
           <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{data}</Text>
-          <View style={styles.bubbleMetaRow}>
-            <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
-              {timeStr}
-            </Text>
-            {isMine && (
-              <Ionicons
-                name={item.is_read ? 'checkmark-done' : 'checkmark'}
-                size={13}
-                color="rgba(255,255,255,0.85)"
-                style={styles.bubbleTicks}
-              />
-            )}
-          </View>
+          <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>{timeStr}</Text>
         </View>
       </View>
     );
@@ -619,33 +569,38 @@ export default function ChatThread({ conversation, onBack, targetOfferId }) {
               <Text style={styles.emptyText}>Chưa có tin nhắn nào. Gửi lời chào để bắt đầu!</Text>
             </View>
           }
+<<<<<<< HEAD
           renderItem={({ item }) => renderBubble(item)}
+=======
+          renderItem={({ item }) => {
+            const isMine = item.sender_id === myUserId;
+            return (
+              <View style={[styles.bubbleRow, isMine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
+                <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                  <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{item.message}</Text>
+                  <View style={styles.bubbleMetaRow}>
+                    <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
+                      {formatMessageTime(item.created_at)}
+                    </Text>
+                    {/* Trạng thái đã xem chỉ có ý nghĩa với tin nhắn CỦA MÌNH gửi đi
+                        — is_read lấy thẳng từ cột thật trong bảng messages (được
+                        chat.service.js markMessagesRead() cập nhật khi đối phương
+                        mở hội thoại này ra xem). */}
+                    {isMine && (
+                      <Ionicons
+                        name={item.is_read ? 'checkmark-done' : 'checkmark'}
+                        size={13}
+                        color="rgba(255,255,255,0.85)"
+                        style={styles.bubbleTicks}
+                      />
+                    )}
+                  </View>
+                </View>
+              </View>
+            );
+          }}
+>>>>>>> origin/main
         />
-      )}
-
-      {showDealBar && (
-        <View style={styles.dealBar}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.dealBarTitle} numberOfLines={1}>
-              🐟 {negotiation.species_name} • {negotiation.quantity_kg}kg
-            </Text>
-            <Text style={styles.dealBarSub} numberOfLines={1}>
-              {Number(negotiation.price_per_kg) > 0
-                ? `Giá niêm yết ${formatVND(negotiation.price_per_kg)}/kg — đề xuất giá của bạn`
-                : 'Đề xuất giá để người bán chấp nhận và tạo đơn'}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.dealBarBtn}
-            onPress={() => { setShowActions(false); setPriceModalVisible(true); }}
-            disabled={sending}
-            accessibilityRole="button"
-            accessibilityLabel="Đề xuất giá mua"
-          >
-            <Ionicons name="pricetag" size={14} color="#fff" />
-            <Text style={styles.dealBarBtnText}>Đề xuất giá</Text>
-          </TouchableOpacity>
-        </View>
       )}
 
       {showActions && (
@@ -820,10 +775,9 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 14, color: colors.textPrimary },
   bubbleTextMine: { color: colors.textOnPrimary },
-  bubbleMetaRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 3, gap: 3 },
-  bubbleTime: { fontSize: 10, color: colors.textFaint },
-  bubbleTimeMine: { color: 'rgba(255,255,255,0.85)' },
-  bubbleTicks: { marginLeft: 1 },
+<<<<<<< HEAD
+  bubbleTime: { fontSize: 10, color: colors.textMuted, marginTop: 4, textAlign: 'right' },
+  bubbleTimeMine: { color: 'rgba(255,255,255,0.7)' },
   bubbleTimeBelowImage: { fontSize: 10, color: colors.textMuted, marginTop: 4, textAlign: 'right' },
 
   imageBubble: { padding: 0, maxWidth: '75%', backgroundColor: 'transparent', borderWidth: 0 },
@@ -889,17 +843,6 @@ const styles = StyleSheet.create({
   systemText: { fontSize: 13, color: colors.textPrimary, fontWeight: '600', textAlign: 'center', marginTop: 4 },
   systemSubText: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
 
-  dealBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10,
-    backgroundColor: '#fffbeb', borderTopWidth: 1, borderTopColor: '#fde68a',
-  },
-  dealBarTitle: { fontSize: 13, fontWeight: 'bold', color: colors.textPrimary },
-  dealBarSub: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  dealBarBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: colors.warningAccent, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10,
-  },
-  dealBarBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
   actionsBar: {
     flexDirection: 'row', gap: 20, paddingHorizontal: 20, paddingVertical: 12,
     backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border,
@@ -907,6 +850,12 @@ const styles = StyleSheet.create({
   actionBtn: { alignItems: 'center', gap: 4 },
   actionLabel: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
 
+=======
+  bubbleMetaRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 3, gap: 3 },
+  bubbleTime: { fontSize: 10, color: colors.textFaint },
+  bubbleTimeMine: { color: 'rgba(255,255,255,0.85)' },
+  bubbleTicks: { marginLeft: 1 },
+>>>>>>> origin/main
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', padding: 10, gap: 8,
     backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border,

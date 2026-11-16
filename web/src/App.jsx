@@ -4,6 +4,7 @@ import LoginScreen from './components/LoginScreen';
 import AdminDashboard from './components/AdminDashboard';
 import OrderManagement from './components/OrderManagement';
 import FleetManagement from './components/FleetManagement';
+import SpeciesManagement from './components/SpeciesManagement';
 import MobileAppSimulator from './components/MobileAppSimulator';
 import AIVisionPlayground from './components/AIVisionPlayground';
 import MaritimeMap from './components/MaritimeMap';
@@ -126,6 +127,10 @@ export default function App() {
 
         {canViewActiveTab && activeTab === 'admin' && (
           <AdminDashboard />
+        )}
+
+        {canViewActiveTab && activeTab === 'species' && (
+          <SpeciesManagement />
         )}
 
         {canViewActiveTab && activeTab === 'orders' && (

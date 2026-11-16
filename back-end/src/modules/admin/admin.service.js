@@ -38,49 +38,120 @@ const updateUser = async (userId, { role, status }) => {
 };
 
 // table/column là hằng số nội bộ (không lấy từ request) nên ghép chuỗi an toàn
-const countBy = async (table, column) => {
-  const result = await pool.query(
-    `SELECT ${column} AS key, COUNT(*)::int AS count FROM ${table} GROUP BY ${column}`
-  );
+const countBy = async (table, column, whereClause = '', params = []) => {
+  const query = `SELECT ${column} AS key, COUNT(*)::int AS count FROM ${table} ${whereClause ? 'WHERE ' + whereClause : ''} GROUP BY ${column}`;
+  const result = await pool.query(query, params);
   return Object.fromEntries(result.rows.map(row => [row.key, row.count]));
+};
+
+/**
+ * Tạo điều kiện lọc thời gian theo period / startDate / endDate
+ */
+const buildDateFilter = (field = 'created_at', { period = 'all', startDate, endDate } = {}) => {
+  const conditions = [];
+  const params = [];
+  let idx = 1;
+
+  if (startDate) {
+    conditions.push(`${field} >= $${idx++}`);
+    params.push(new Date(startDate));
+  }
+  if (endDate) {
+    conditions.push(`${field} <= $${idx++}`);
+    params.push(new Date(endDate));
+  }
+
+  if (!startDate && !endDate) {
+    if (period === 'today') {
+      conditions.push(`${field} >= CURRENT_DATE`);
+    } else if (period === '7days') {
+      conditions.push(`${field} >= NOW() - INTERVAL '7 days'`);
+    } else if (period === '30days') {
+      conditions.push(`${field} >= NOW() - INTERVAL '30 days'`);
+    }
+  }
+
+  return {
+    whereSql: conditions.length > 0 ? conditions.join(' AND ') : '',
+    andSql: conditions.length > 0 ? ` AND ${conditions.join(' AND ')}` : '',
+    params,
+    period
+  };
 };
 
 /**
  * Số liệu tổng quan cho trang Thống Kê của web admin.
  * Giá trị giao dịch bỏ qua đơn CANCELLED / REJECTED.
+ * Hỗ trợ lọc theo period ('all' | 'today' | '7days' | '30days') hoặc startDate / endDate.
  */
-const getStats = async () => {
-  const [usersByRole, usersByStatus, vesselsByStatus, batchesByStatus, ordersByStatus, revenue, speciesVolume, monthlyOrders] =
-    await Promise.all([
-      countBy('users', 'role'),
-      countBy('users', 'status'),
-      countBy('vessels', 'status'),
-      countBy('seafood_batches', 'status'),
-      countBy('orders', 'status'),
-      pool.query(`
-        SELECT COALESCE(SUM(total_amount), 0)::float AS total_value, COUNT(*)::int AS order_count
-        FROM orders WHERE status NOT IN ('CANCELLED', 'REJECTED')
-      `),
-      pool.query(`
-        SELECT s.name_vi AS species, SUM(b.quantity_kg)::float AS total_kg, COUNT(*)::int AS batch_count
-        FROM seafood_batches b
-        JOIN seafood_species s ON s.id = b.species_id
-        GROUP BY s.name_vi
-        ORDER BY total_kg DESC
-      `),
-      pool.query(`
-        SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
-               COUNT(*)::int AS order_count,
-               COALESCE(SUM(total_amount), 0)::float AS total_value
-        FROM orders
-        WHERE status NOT IN ('CANCELLED', 'REJECTED')
-          AND created_at >= date_trunc('month', NOW()) - INTERVAL '5 months'
-        GROUP BY 1
-        ORDER BY 1
-      `)
-    ]);
+const getStats = async (filters = {}) => {
+  const dateFilter = buildDateFilter('created_at', filters);
+  const { andSql, params, period } = dateFilter;
+
+  // Lọc doanh thu và đơn hàng
+  const revenueQuery = `
+    SELECT COALESCE(SUM(total_amount), 0)::float AS total_value, COUNT(*)::int AS order_count
+    FROM orders
+    WHERE status NOT IN ('CANCELLED', 'REJECTED') ${andSql}
+  `;
+
+  // Sản lượng theo loài
+  const batchDateFilter = buildDateFilter('b.created_at', filters);
+  const speciesVolumeQuery = `
+    SELECT s.name_vi AS species, SUM(b.quantity_kg)::float AS total_kg, COUNT(*)::int AS batch_count
+    FROM seafood_batches b
+    JOIN seafood_species s ON s.id = b.species_id
+    ${batchDateFilter.whereSql ? 'WHERE ' + batchDateFilter.whereSql : ''}
+    GROUP BY s.name_vi
+    ORDER BY total_kg DESC
+  `;
+
+  // Biểu đồ xu hướng theo ngày hoặc theo tháng tuỳ theo period
+  let trendQuery;
+  if (period === 'today' || period === '7days') {
+    trendQuery = `
+      SELECT to_char(date_trunc('day', created_at), 'DD/MM') AS month,
+             COUNT(*)::int AS order_count,
+             COALESCE(SUM(total_amount), 0)::float AS total_value
+      FROM orders
+      WHERE status NOT IN ('CANCELLED', 'REJECTED') ${andSql}
+      GROUP BY 1, date_trunc('day', created_at)
+      ORDER BY date_trunc('day', created_at) ASC
+    `;
+  } else {
+    trendQuery = `
+      SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+             COUNT(*)::int AS order_count,
+             COALESCE(SUM(total_amount), 0)::float AS total_value
+      FROM orders
+      WHERE status NOT IN ('CANCELLED', 'REJECTED') ${andSql}
+      GROUP BY 1, date_trunc('month', created_at)
+      ORDER BY date_trunc('month', created_at) ASC
+    `;
+  }
+
+  const [
+    usersByRole,
+    usersByStatus,
+    vesselsByStatus,
+    batchesByStatus,
+    ordersByStatus,
+    revenue,
+    speciesVolume,
+    monthlyOrders
+  ] = await Promise.all([
+    countBy('users', 'role'),
+    countBy('users', 'status'),
+    countBy('vessels', 'status'),
+    countBy('seafood_batches', 'status', dateFilter.whereSql, params),
+    countBy('orders', 'status', dateFilter.whereSql, params),
+    pool.query(revenueQuery, params),
+    pool.query(speciesVolumeQuery, batchDateFilter.params),
+    pool.query(trendQuery, params)
+  ]);
 
   return {
+    period: filters.period || 'all',
     users: { by_role: usersByRole, by_status: usersByStatus },
     vessels: { by_status: vesselsByStatus },
     batches: { by_status: batchesByStatus },

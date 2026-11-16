@@ -43,7 +43,7 @@ const updateUser = async (req, res, next) => {
 // [GET] /api/admin/stats
 const getStats = async (req, res, next) => {
   try {
-    const stats = await adminService.getStats();
+    const stats = await adminService.getStats(req.query);
     res.json({
       status: 200,
       message: 'Lấy số liệu thống kê thành công',

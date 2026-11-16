@@ -18,7 +18,11 @@ export async function updateUser(id, changes) {
   return res.metadata;
 }
 
-export async function fetchAdminStats() {
-  const res = await apiFetch('/api/admin/stats');
+export async function fetchAdminStats(filters = {}) {
+  const params = new URLSearchParams(
+    Object.entries(filters).filter(([, value]) => value !== undefined && value !== '')
+  );
+  const q = params.toString();
+  const res = await apiFetch(`/api/admin/stats${q ? `?${q}` : ''}`);
   return res.metadata;
 }

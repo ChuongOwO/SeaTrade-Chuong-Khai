@@ -7,7 +7,11 @@ import {
   CheckCircle2,
   Eye,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  CreditCard,
+  Clock,
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 import { fetchOrders, updateOrderStatus } from '../api/orders';
 
@@ -47,11 +51,12 @@ function StatusBadge({ status }) {
   return <span className={`badge-sm ${meta.badge}`}>{meta.label}</span>;
 }
 
-// is_paid: đơn đã có khoản thanh toán VNPay PAID (back-end order.service.js)
-function PaymentBadge({ paid }) {
-  return paid
-    ? <span className="badge-sm badge-emerald">Đã thanh toán</span>
-    : <span className="badge-sm badge-amber">Chưa thanh toán</span>;
+// is_paid: đơn đã có khoản thanh toán PAID (VNPay hoặc tiền mặt)
+function PaymentBadge({ paid, method }) {
+  if (!paid) return <span className="badge-sm badge-amber">Chưa thanh toán</span>;
+  if (method === 'VNPAY') return <span className="badge-sm badge-emerald">VNPay (Đã TT)</span>;
+  if (method === 'BANK_TRANSFER') return <span className="badge-sm badge-emerald">Chuyển khoản (Đã TT)</span>;
+  return <span className="badge-sm badge-emerald">Đã thanh toán</span>;
 }
 
 export default function OrderManagement() {
@@ -149,7 +154,14 @@ export default function OrderManagement() {
         <td>
           <div className="flex flex-col items-start gap-1">
             <StatusBadge status={order.status} />
-            {!CLOSED_STATUSES.includes(order.status) && <PaymentBadge paid={order.is_paid} />}
+            {!CLOSED_STATUSES.includes(order.status) && (
+              <PaymentBadge paid={order.is_paid} method={order.payment?.payment_method} />
+            )}
+            {order.purchase_type === 'BUY_NOW' && (
+              <span className="badge-sm badge-rose flex items-center gap-0.5 text-[10px]">
+                <Zap className="w-2.5 h-2.5" /> Mua ngay
+              </span>
+            )}
           </div>
         </td>
         <td className="text-right">
@@ -268,12 +280,125 @@ export default function OrderManagement() {
             <div className="flex items-center gap-2.5">
               <span className="badge badge-cyan">Chi Tiết Đơn Hàng</span>
               <StatusBadge status={selectedOrder.status} />
-              <PaymentBadge paid={selectedOrder.is_paid} />
+              <PaymentBadge paid={selectedOrder.is_paid} method={selectedOrder.payment?.payment_method} />
+              {selectedOrder.purchase_type === 'BUY_NOW' && (
+                <span className="badge-sm badge-rose flex items-center gap-1">
+                  <Zap className="w-3 h-3" /> Đơn Mua Ngay
+                </span>
+              )}
             </div>
 
             <h3 className="text-xl font-bold text-slate-900">
               {shortId(selectedOrder.id)} — {getSpeciesNames(selectedOrder)}
             </h3>
+
+            {/* Chi Tiết Thanh Toán & VNPay */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-sky-600" />
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Thông Tin Thanh Toán & Giao Dịch
+                  </span>
+                </div>
+                <span className="text-xs text-slate-500 font-medium">
+                  {selectedOrder.payment?.status === 'PAID' ? (
+                    <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Đã thu tiền thành công
+                    </span>
+                  ) : (
+                    <span className="text-amber-600 font-semibold">Chưa hoàn tất thanh toán</span>
+                  )}
+                </span>
+              </div>
+
+              {selectedOrder.payment ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-slate-500">Hình thức thanh toán:</span>
+                    <p className="font-semibold text-slate-800 mt-0.5">
+                      {selectedOrder.payment.payment_method === 'VNPAY'
+                        ? 'Cổng thanh toán điện tử VNPay'
+                        : selectedOrder.payment.payment_method === 'BANK_TRANSFER'
+                        ? 'Chuyển khoản trực tiếp'
+                        : 'Tiền mặt khi nhận hàng'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-500">Mã giao dịch hệ thống (TxnRef):</span>
+                    <p className="font-mono font-medium text-slate-800 mt-0.5">
+                      {selectedOrder.payment.transaction_code || '—'}
+                    </p>
+                  </div>
+
+                  {selectedOrder.payment.payment_method === 'VNPAY' && (
+                    <>
+                      <div>
+                        <span className="text-slate-500">Mã GD bên VNPay (gateway_txn_no):</span>
+                        <p className="font-mono font-semibold text-sky-700 mt-0.5">
+                          {selectedOrder.payment.gateway_txn_no || 'Đang chờ cổng xác nhận'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Ngân hàng thanh toán (bank_code):</span>
+                        <p className="font-medium text-slate-800 mt-0.5">
+                          {selectedOrder.payment.bank_code || 'NCB / Thẻ nội địa'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Mã phản hồi cổng (vnp_ResponseCode):</span>
+                        <p className="font-mono font-medium text-slate-800 mt-0.5">
+                          {selectedOrder.payment.response_code === '00'
+                            ? '00 (Giao dịch thành công)'
+                            : selectedOrder.payment.response_code || '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Thời gian cổng ghi nhận (paid_at):</span>
+                        <p className="font-mono text-slate-800 mt-0.5">
+                          {selectedOrder.payment.paid_at
+                            ? new Date(selectedOrder.payment.paid_at).toLocaleString('vi-VN')
+                            : '—'}
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="sm:col-span-2 pt-2 border-t border-slate-200/50 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-slate-500">Người bán xác nhận đã nhận tiền:</span>
+                    <span className="font-medium">
+                      {selectedOrder.payment.seller_confirmed_at ? (
+                        <span className="text-emerald-700 font-semibold inline-flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Đã xác nhận (
+                          {new Date(selectedOrder.payment.seller_confirmed_at).toLocaleString('vi-VN')})
+                        </span>
+                      ) : (
+                        <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                          Chưa bấm xác nhận
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-slate-500 italic py-1">
+                  Đơn hàng này chưa tạo giao dịch thanh toán trực tuyến hoặc người mua thanh toán tiền mặt trực tiếp.
+                </div>
+              )}
+
+              {selectedOrder.hold_expires_at &&
+                selectedOrder.status === 'CONFIRMED' &&
+                !selectedOrder.is_paid && (
+                  <div className="flex items-center gap-2 p-2.5 bg-amber-50 rounded-xl text-amber-800 text-xs border border-amber-200/60">
+                    <Clock className="w-4 h-4 shrink-0 text-amber-600" />
+                    <span>
+                      Hạn giữ hàng mua ngay:{' '}
+                      <strong>{new Date(selectedOrder.hold_expires_at).toLocaleString('vi-VN')}</strong>. Sau thời gian này hệ thống sẽ tự động hủy đơn và nhả mẻ cá lại chợ.
+                    </span>
+                  </div>
+                )}
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
