@@ -1,14 +1,11 @@
 import React from 'react';
 import {
   ShieldCheck,
-  Smartphone,
-  Scan,
   Navigation,
   BarChart3,
   BookOpen,
   Radio,
   Wifi,
-  Anchor,
   Package,
   Ship,
   Users,
@@ -30,10 +27,8 @@ const NAV_GROUPS = [
     ]
   },
   {
-    label: 'Mô Phỏng & AI',
+    label: 'Hải Trình',
     items: [
-      { id: 'mobile', label: 'Mobile App', icon: Smartphone },
-      { id: 'ai-vision', label: 'AI Vision', icon: Scan },
       { id: 'sea-map', label: 'Bản Đồ Hải Trình', icon: Navigation }
     ]
   },
@@ -65,9 +60,7 @@ export default function Navbar({ activeTab, setActiveTab, offlineMode, setOfflin
     <aside className="sidebar">
       <div className="sidebar-brand">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-sky-600 shrink-0 flex items-center justify-center">
-            <Anchor className="w-4.5 h-4.5 text-white animate-float" />
-          </div>
+          <img src="/logo.png" alt="" className="w-9 h-9 rounded-xl shrink-0" />
           <div className="min-w-0">
             <h1 className="font-display text-sm font-extrabold tracking-tight text-slate-900 truncate">SeaTrade AI</h1>
             <p className="text-[11px] text-slate-400 truncate">Giao thương hải sản & AI</p>

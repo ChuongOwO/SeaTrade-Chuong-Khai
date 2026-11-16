@@ -1,14 +1,14 @@
 const crypto = require('crypto');
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenAI } = require('@google/genai');
+const pool = require('../../../config/database');
 const { TOOL_DEFINITIONS, TOOLS_BY_NAME } = require('./agent.tools');
 const { createMockClient } = require('./agent.mock');
 
-const MODEL = 'claude-opus-5-5';
-// Tự chạy lại trên model dự phòng nếu model chính từ chối (refusal)
-const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+// Model mặc định có gói miễn phí; đổi sang model mạnh hơn bằng GEMINI_MODEL trong .env
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+// Model dừng vì chính sách nội dung -> coi như từ chối trả lời
+const BLOCKED_FINISH_REASONS = ['SAFETY', 'RECITATION', 'BLOCKLIST', 'PROHIBITED_CONTENT', 'SPII'];
 const MAX_TOOL_ROUNDS = 8; // chặn vòng lặp tool vô hạn trong 1 lượt chat
-const CONVERSATION_TTL_MS = 2 * 60 * 60 * 1000;
-const MAX_CONVERSATIONS = 200;
 
 class AgentError extends Error {
   constructor(statusCode, message) {
@@ -28,95 +28,112 @@ Nguyên tắc:
 - Trước khi đề xuất thao tác, tra cứu để có đúng UUID đầy đủ của đối tượng. Nếu yêu cầu mơ hồ hoặc khớp nhiều đối tượng, hỏi lại admin thay vì đoán.
 - Nếu admin từ chối một thao tác, ghi nhận và không đề xuất lại trừ khi được yêu cầu.`;
 
-// Hội thoại lưu trong bộ nhớ server, chỉ NỐI THÊM (append-only): nội dung trả
-// về của model (gồm cả khối thinking) phải được gửi lại nguyên vẹn ở lượt sau.
-// Khởi động lại server thì mất lịch sử — chấp nhận được với trợ lý admin.
-const conversations = new Map();
-
-const pruneConversations = () => {
-  const now = Date.now();
-  for (const [id, conversation] of conversations) {
-    if (now - conversation.updatedAt > CONVERSATION_TTL_MS) conversations.delete(id);
-  }
-  while (conversations.size > MAX_CONVERSATIONS) {
-    conversations.delete(conversations.keys().next().value);
-  }
+// Hội thoại lưu ở bảng agent_conversations (mỗi admin 1 cuộc đang mở), nên tải
+// lại trang hay khởi động lại server đều không mất. `contents` theo định dạng
+// của Gemini và chỉ NỐI THÊM (append-only): các part model trả về (gồm cả
+// thoughtSignature) phải được gửi lại nguyên vẹn thì gọi hàm mới hoạt động đúng.
+const findConversation = async (adminId) => {
+  const result = await pool.query(
+    'SELECT id, contents, pending, transcript FROM agent_conversations WHERE admin_id = $1',
+    [adminId]
+  );
+  return result.rows[0] ? { ...result.rows[0], adminId } : null;
 };
+
+// Cuộc mới (id khác) ghi đè cuộc cũ của cùng admin
+const saveConversation = ({ id, adminId, contents, pending, transcript }) =>
+  pool.query(
+    `INSERT INTO agent_conversations (id, admin_id, contents, pending, transcript)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (admin_id) DO UPDATE
+     SET id = EXCLUDED.id, contents = EXCLUDED.contents, pending = EXCLUDED.pending,
+         transcript = EXCLUDED.transcript, updated_at = NOW()`,
+    // pg coi mảng JS là mảng Postgres -> phải tự chuyển sang chuỗi JSON cho cột jsonb
+    [id, adminId, JSON.stringify(contents), JSON.stringify(pending), JSON.stringify(transcript)]
+  );
 
 // AI_AGENT_MOCK=true: dùng model giả lập (agent.mock.js), không cần API key
 const isMockMode = () => process.env.AI_AGENT_MOCK === 'true';
 
-let client = null;
-const getClient = () => {
-  if (isMockMode()) return createMockClient();
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new AgentError(503, 'Trợ lý AI chưa được cấu hình: thiếu ANTHROPIC_API_KEY trong back-end/.env');
-  }
-  client = client || new Anthropic();
-  return client;
+const createGeminiClient = () => {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return {
+    generate: async (contents) => {
+      const response = await ai.models.generateContent({
+        model: process.env.GEMINI_MODEL || DEFAULT_MODEL,
+        contents,
+        config: {
+          systemInstruction: `${SYSTEM_PROMPT}\n\nHôm nay là ${new Date().toLocaleDateString('vi-VN')}.`,
+          tools: [{ functionDeclarations: TOOL_DEFINITIONS }]
+        }
+      });
+      const candidate = response.candidates?.[0];
+      return { parts: candidate?.content?.parts || [], finishReason: candidate?.finishReason };
+    }
+  };
 };
 
-const getConversation = (conversationId, admin) => {
-  const conversation = conversations.get(conversationId);
-  if (!conversation || conversation.adminId !== admin.id) {
-    throw new AgentError(404, 'Cuộc hội thoại không tồn tại hoặc đã hết hạn, hãy bắt đầu cuộc mới');
+// Client = { generate(contents) -> { parts, finishReason } }; bản Gemini thật và
+// bản giả lập có chung giao diện này nên đi qua cùng một vòng lặp agent.
+let geminiClient = null;
+const getClient = () => {
+  if (isMockMode()) return createMockClient();
+  if (!process.env.GEMINI_API_KEY) {
+    throw new AgentError(503, 'Trợ lý AI chưa được cấu hình: thiếu GEMINI_API_KEY trong back-end/.env');
+  }
+  geminiClient = geminiClient || createGeminiClient();
+  return geminiClient;
+};
+
+const getConversation = async (conversationId, admin) => {
+  const conversation = await findConversation(admin.id);
+  if (!conversation || conversation.id !== conversationId) {
+    throw new AgentError(404, 'Cuộc hội thoại không còn tồn tại, hãy bắt đầu cuộc mới');
   }
   return conversation;
 };
 
-const extractText = (content) =>
-  content.filter(block => block.type === 'text').map(block => block.text).join('\n').trim();
+const userTurn = (parts) => ({ role: 'user', parts });
 
-const toolResult = (toolUseId, payload, isError = false) => ({
-  type: 'tool_result',
-  tool_use_id: toolUseId,
-  content: JSON.stringify(payload),
-  ...(isError && { is_error: true })
+const extractText = (parts) =>
+  parts.filter(part => part.text && !part.thought).map(part => part.text).join('\n').trim();
+
+// Gemini không phải lúc nào cũng trả id cho functionCall -> chỉ gửi lại khi có
+const toolResponse = ({ id, name }, payload) => ({
+  functionResponse: { ...(id && { id }), name, response: payload }
 });
 
-const runTool = async (tool, toolUse, admin) => {
+const isErrorResponse = (part) => 'error' in part.functionResponse.response;
+
+const runTool = async (tool, call, admin) => {
   try {
-    return toolResult(toolUse.id, await tool.run(toolUse.input, admin));
+    return toolResponse(call, await tool.run(call.args || {}, admin));
   } catch (error) {
-    return toolResult(toolUse.id, { error: error.message }, true);
+    return toolResponse(call, { error: error.message });
   }
 };
 
-const callModel = (messages) =>
-  getClient().beta.messages.create({
-    model: MODEL,
-    max_tokens: 16000,
-    betas: [FALLBACK_BETA],
-    fallbacks: 'default',
-    output_config: { effort: 'medium' },
-    // Tự động cache phần đầu ổn định (tools + system + lịch sử) giữa các lượt
-    cache_control: { type: 'ephemeral' },
-    system: `${SYSTEM_PROMPT}\n\nHôm nay là ${new Date().toLocaleDateString('vi-VN')}.`,
-    tools: TOOL_DEFINITIONS,
-    messages
-  });
-
 /**
- * Xử lý các tool_use trong 1 lượt trả lời của model: tool đọc chạy ngay, tool
- * ghi chỉ tạo "thao tác chờ xác nhận". Trả về { results, actions }.
+ * Xử lý các functionCall trong 1 lượt trả lời của model: tool đọc chạy ngay,
+ * tool ghi chỉ tạo "thao tác chờ xác nhận". Trả về { results, actions }.
  */
-const handleToolUses = async (toolUses, admin) => {
+const handleFunctionCalls = async (calls, admin) => {
   const results = [];
   const actions = [];
 
-  for (const toolUse of toolUses) {
-    const tool = TOOLS_BY_NAME[toolUse.name];
+  for (const call of calls) {
+    const tool = TOOLS_BY_NAME[call.name];
     if (!tool) {
-      results.push(toolResult(toolUse.id, { error: `Không có công cụ ${toolUse.name}` }, true));
+      results.push(toolResponse(call, { error: `Không có công cụ ${call.name}` }));
     } else if (!tool.requiresConfirmation) {
-      results.push(await runTool(tool, toolUse, admin));
+      results.push(await runTool(tool, call, admin));
     } else {
       try {
-        const summary = await tool.describe(toolUse.input, admin);
-        actions.push({ id: toolUse.id, tool: toolUse.name, input: toolUse.input, summary });
+        const summary = await tool.describe(call.args || {}, admin);
+        actions.push({ id: crypto.randomUUID(), call, summary });
       } catch (error) {
         // Đề xuất không hợp lệ (sai id, tự khoá mình...) -> báo lại cho model tự sửa
-        results.push(toolResult(toolUse.id, { error: error.message }, true));
+        results.push(toolResponse(call, { error: error.message }));
       }
     }
   }
@@ -125,53 +142,63 @@ const handleToolUses = async (toolUses, admin) => {
 
 /**
  * Vòng lặp agent cho tới khi model trả lời xong, hoặc dừng lại chờ admin xác
- * nhận thao tác ghi. Mọi tool_result của 1 lượt gửi chung trong 1 message.
+ * nhận thao tác ghi. Mọi functionResponse của 1 lượt gửi chung trong 1 turn.
  */
 const runUntilReply = async (conversation, admin) => {
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const response = await callModel(conversation.messages);
-    conversation.messages.push({ role: 'assistant', content: response.content });
+    const { parts, finishReason } = await getClient().generate(conversation.contents);
 
-    if (response.stop_reason === 'refusal') {
+    if (BLOCKED_FINISH_REASONS.includes(finishReason)) {
       return { reply: 'Trợ lý không thể xử lý yêu cầu này. Hãy diễn đạt lại hoặc thao tác trực tiếp trên giao diện.' };
     }
-    if (response.stop_reason === 'pause_turn') continue;
+    if (parts.length === 0) return { reply: 'Trợ lý chưa đưa ra câu trả lời, hãy thử hỏi lại.' };
+    conversation.contents.push({ role: 'model', parts });
 
-    const text = extractText(response.content);
-    const toolUses = response.content.filter(block => block.type === 'tool_use');
-    if (toolUses.length === 0 || response.stop_reason === 'max_tokens') {
+    const text = extractText(parts);
+    const calls = parts.filter(part => part.functionCall).map(part => part.functionCall);
+    if (calls.length === 0) {
       return { reply: text || 'Trợ lý chưa đưa ra câu trả lời, hãy thử hỏi lại.' };
     }
 
-    const { results, actions } = await handleToolUses(toolUses, admin);
+    const { results, actions } = await handleFunctionCalls(calls, admin);
     if (actions.length > 0) {
       conversation.pending = { results, actions };
-      return { reply: text, pendingActions: actions.map(({ id, tool, summary }) => ({ id, tool, summary })) };
+      return {
+        reply: text,
+        pendingActions: actions.map(({ id, call, summary }) => ({ id, tool: call.name, summary }))
+      };
     }
-    conversation.messages.push({ role: 'user', content: results });
+    conversation.contents.push(userTurn(results));
   }
   return { reply: 'Yêu cầu cần quá nhiều bước tra cứu, hãy chia nhỏ câu hỏi.' };
 };
 
-const getMode = () => (isMockMode() ? 'mock' : 'claude');
+const getMode = () => (isMockMode() ? 'mock' : 'gemini');
+
+// Chạy model, ghi câu trả lời vào transcript (để web hiển thị lại) rồi lưu DB
+const replyAndSave = async (conversation, admin) => {
+  const outcome = await runUntilReply(conversation, admin);
+  if (outcome.reply || outcome.pendingActions) {
+    conversation.transcript.push({ role: 'assistant', text: outcome.reply, actions: outcome.pendingActions });
+  }
+  await saveConversation(conversation);
+  return { conversationId: conversation.id, mode: getMode(), ...outcome };
+};
 
 const chat = async (admin, { conversationId, message }) => {
-  pruneConversations();
-
   let conversation;
   if (conversationId) {
-    conversation = getConversation(conversationId, admin);
+    conversation = await getConversation(conversationId, admin);
     if (conversation.pending) {
       throw new AgentError(409, 'Còn thao tác đang chờ xác nhận, hãy xác nhận hoặc từ chối trước');
     }
   } else {
-    conversation = { id: crypto.randomUUID(), adminId: admin.id, messages: [], pending: null };
-    conversations.set(conversation.id, conversation);
+    conversation = { id: crypto.randomUUID(), adminId: admin.id, contents: [], pending: null, transcript: [] };
   }
 
-  conversation.updatedAt = Date.now();
-  conversation.messages.push({ role: 'user', content: message });
-  return { conversationId: conversation.id, mode: getMode(), ...(await runUntilReply(conversation, admin)) };
+  conversation.contents.push(userTurn([{ text: message }]));
+  conversation.transcript.push({ role: 'admin', text: message });
+  return replyAndSave(conversation, admin);
 };
 
 /**
@@ -179,26 +206,45 @@ const chat = async (admin, { conversationId, message }) => {
  * tác được duyệt, báo kết quả cho model rồi để model trả lời tiếp.
  */
 const confirm = async (admin, { conversationId, decisions }) => {
-  const conversation = getConversation(conversationId, admin);
+  const conversation = await getConversation(conversationId, admin);
   const { pending } = conversation;
   if (!pending) throw new AgentError(409, 'Không có thao tác nào đang chờ xác nhận');
 
   const results = [...pending.results];
   const executed = [];
+  const shownActions = conversation.transcript.at(-1).actions;
   for (const action of pending.actions) {
-    if (decisions[action.id] === true) {
-      const result = await runTool(TOOLS_BY_NAME[action.tool], action, admin);
+    const approved = decisions[action.id] === true;
+    shownActions.find(shown => shown.id === action.id).decision = approved;
+    if (approved) {
+      const result = await runTool(TOOLS_BY_NAME[action.call.name], action.call, admin);
       results.push(result);
-      executed.push({ id: action.id, success: !result.is_error });
+      executed.push({ id: action.id, success: !isErrorResponse(result) });
     } else {
-      results.push(toolResult(action.id, { done: false, message: 'Admin đã TỪ CHỐI thao tác này, không thực hiện.' }));
+      results.push(toolResponse(action.call, { done: false, message: 'Admin đã TỪ CHỐI thao tác này, không thực hiện.' }));
     }
   }
 
   conversation.pending = null;
-  conversation.updatedAt = Date.now();
-  conversation.messages.push({ role: 'user', content: results });
-  return { conversationId, executed, mode: getMode(), ...(await runUntilReply(conversation, admin)) };
+  conversation.contents.push(userTurn(results));
+  // Lưu ngay: thao tác đã chạy thì không được chờ duyệt lại, kể cả khi model lỗi ở bước sau
+  await saveConversation(conversation);
+  return { executed, ...(await replyAndSave(conversation, admin)) };
 };
 
-module.exports = { chat, confirm, AgentError };
+// Cuộc trò chuyện đang mở của admin, để web hiển thị lại sau khi tải lại trang
+const getCurrent = async (admin) => {
+  const conversation = await findConversation(admin.id);
+  return {
+    conversationId: conversation?.id || null,
+    mode: getMode(),
+    messages: conversation?.transcript || []
+  };
+};
+
+const reset = async (admin) => {
+  await pool.query('DELETE FROM agent_conversations WHERE admin_id = $1', [admin.id]);
+  return { conversationId: null };
+};
+
+module.exports = { chat, confirm, getCurrent, reset, AgentError };

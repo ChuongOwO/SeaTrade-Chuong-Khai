@@ -11,6 +11,17 @@ export async function askAgent(message, conversationId = null) {
   return res.metadata;
 }
 
+// Cuộc trò chuyện đang mở (lưu ở DB) để hiển thị lại sau khi tải lại trang.
+// Kết quả: { conversationId, mode, messages: [{ role, text, actions?: [{ id, tool, summary, decision? }] }] }
+export async function fetchAgentConversation() {
+  const res = await apiFetch('/api/admin/agent/conversation');
+  return res.metadata;
+}
+
+export async function resetAgentConversation() {
+  await apiFetch('/api/admin/agent/conversation', { method: 'DELETE' });
+}
+
 // decisions: { [actionId]: true (duyệt) | false (từ chối) }
 export async function confirmAgentActions(conversationId, decisions) {
   const res = await apiFetch('/api/admin/agent/confirm', {

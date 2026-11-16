@@ -5,8 +5,8 @@ const vesselService = require('../../vessels/vessel.service');
 const batchService = require('../../seafood/batch.service');
 
 // Công cụ (tools) của Trợ lý AI cho admin. Mỗi tool gồm:
-//   - definition: khai báo gửi lên Claude (JSON Schema, strict: true để input
-//     luôn đúng schema; field tuỳ chọn khai báo dạng nullable + required)
+//   - definition: khai báo hàm gửi lên Gemini (functionDeclaration, tham số
+//     viết bằng JSON Schema; field tuỳ chọn thì không nằm trong required)
 //   - run(input, admin): thực thi, trả về object sẽ được JSON.stringify
 // Tool ghi (requiresConfirmation) KHÔNG chạy ngay: agent dừng lại, admin bấm
 // Xác nhận trên web thì mới gọi run() (xem agent.service.js).
@@ -21,13 +21,12 @@ const USER_STATUSES = ['ACTIVE', 'INACTIVE', 'BANNED'];
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const nullable = (schema) => ({ ...schema, type: [schema.type, 'null'] });
-const nullableEnum = (values) => ({ type: ['string', 'null'], enum: [...values, null] });
+const enumOf = (values) => ({ type: 'string', enum: values });
 
-const objectSchema = (properties) => ({
+const objectSchema = (required, optional = {}) => ({
   type: 'object',
-  properties,
-  required: Object.keys(properties),
+  properties: { ...required, ...optional },
+  required: Object.keys(required),
   additionalProperties: false
 });
 
@@ -50,8 +49,7 @@ const getOverviewStats = {
   definition: {
     name: 'get_overview_stats',
     description: 'Số liệu tổng quan toàn hệ thống: người dùng theo vai trò/trạng thái, tàu theo trạng thái, mẻ cá theo trạng thái, đơn hàng theo trạng thái, tổng giá trị giao dịch, sản lượng theo loài và giá trị giao dịch 6 tháng gần nhất.',
-    strict: true,
-    input_schema: objectSchema({})
+    parametersJsonSchema: objectSchema({})
   },
   run: () => adminService.getStats()
 };
@@ -60,10 +58,9 @@ const searchOrders = {
   definition: {
     name: 'search_orders',
     description: 'Tìm đơn hàng (mới nhất trước). Lọc theo trạng thái và/hoặc từ khoá (tên/SĐT người mua-bán, tên loài, mã tàu, mã đơn). Mỗi đơn có người mua, người bán, tổng tiền, dòng hàng (loài, kg, đơn giá, tàu).',
-    strict: true,
-    input_schema: objectSchema({
-      status: nullableEnum(ORDER_STATUSES),
-      keyword: nullable({ type: 'string', description: 'Từ khoá tìm kiếm, null nếu không lọc' })
+    parametersJsonSchema: objectSchema({}, {
+      status: enumOf(ORDER_STATUSES),
+      keyword: { type: 'string', description: 'Từ khoá tìm kiếm, bỏ trống nếu không lọc' }
     })
   },
   run: async ({ status, keyword }) => {
@@ -83,10 +80,9 @@ const searchVessels = {
   definition: {
     name: 'search_vessels',
     description: 'Tìm tàu (đánh bắt / thu gom / vận chuyển) kèm chủ tàu và vị trí GPS mới nhất (recorded_at = thời điểm gửi GPS gần nhất, null nếu chưa từng gửi). Lọc theo trạng thái và/hoặc từ khoá (mã tàu, tên tàu, tên/SĐT chủ tàu).',
-    strict: true,
-    input_schema: objectSchema({
-      status: nullableEnum(VESSEL_STATUSES),
-      keyword: nullable({ type: 'string', description: 'Từ khoá tìm kiếm, null nếu không lọc' })
+    parametersJsonSchema: objectSchema({}, {
+      status: enumOf(VESSEL_STATUSES),
+      keyword: { type: 'string', description: 'Từ khoá tìm kiếm, bỏ trống nếu không lọc' }
     })
   },
   run: async ({ status, keyword }) => {
@@ -104,11 +100,10 @@ const searchUsers = {
   definition: {
     name: 'search_users',
     description: 'Tìm tài khoản người dùng kèm vai trò, trạng thái và số tàu sở hữu. Lọc theo từ khoá (tên/SĐT/email), vai trò, trạng thái.',
-    strict: true,
-    input_schema: objectSchema({
-      keyword: nullable({ type: 'string', description: 'Tên, SĐT hoặc email; null nếu không lọc' }),
-      role: nullableEnum(USER_ROLES),
-      status: nullableEnum(USER_STATUSES)
+    parametersJsonSchema: objectSchema({}, {
+      keyword: { type: 'string', description: 'Tên, SĐT hoặc email, bỏ trống nếu không lọc' },
+      role: enumOf(USER_ROLES),
+      status: enumOf(USER_STATUSES)
     })
   },
   run: async ({ keyword, role, status }) =>
@@ -119,9 +114,8 @@ const searchMarket = {
   definition: {
     name: 'search_market',
     description: 'Các mẻ hải sản đang rao bán trên chợ (AVAILABLE): loài, sản lượng kg, chất lượng, giá chào bán đ/kg (null nếu chưa chào giá), tàu, chủ tàu, thời gian đăng. Lọc theo từ khoá tên loài hoặc mã/tên tàu.',
-    strict: true,
-    input_schema: objectSchema({
-      keyword: nullable({ type: 'string', description: 'Tên loài hoặc mã/tên tàu; null nếu không lọc' })
+    parametersJsonSchema: objectSchema({}, {
+      keyword: { type: 'string', description: 'Tên loài hoặc mã/tên tàu, bỏ trống nếu không lọc' }
     })
   },
   run: async ({ keyword }) => {
@@ -156,10 +150,9 @@ const updateOrderStatus = {
   definition: {
     name: 'update_order_status',
     description: 'Đổi trạng thái 1 đơn hàng. CẦN ADMIN XÁC NHẬN trên giao diện trước khi thực hiện. Dùng id đầy đủ (UUID) lấy từ search_orders.',
-    strict: true,
-    input_schema: objectSchema({
+    parametersJsonSchema: objectSchema({
       order_id: { type: 'string', description: 'UUID đầy đủ của đơn hàng' },
-      status: { type: 'string', enum: ORDER_STATUSES },
+      status: enumOf(ORDER_STATUSES),
       reason: { type: 'string', description: 'Lý do ngắn gọn bằng tiếng Việt' }
     })
   },
@@ -180,13 +173,13 @@ const updateUser = {
   requiresConfirmation: true,
   definition: {
     name: 'update_user',
-    description: 'Đổi vai trò và/hoặc trạng thái (khoá: BANNED, tạm ngưng: INACTIVE, mở lại: ACTIVE) của 1 tài khoản. CẦN ADMIN XÁC NHẬN. Không áp dụng cho chính tài khoản admin đang dùng. Dùng id đầy đủ (UUID) lấy từ search_users; field không đổi để null.',
-    strict: true,
-    input_schema: objectSchema({
+    description: 'Đổi vai trò và/hoặc trạng thái (khoá: BANNED, tạm ngưng: INACTIVE, mở lại: ACTIVE) của 1 tài khoản. CẦN ADMIN XÁC NHẬN. Không áp dụng cho chính tài khoản admin đang dùng. Dùng id đầy đủ (UUID) lấy từ search_users; field không đổi thì bỏ trống.',
+    parametersJsonSchema: objectSchema({
       user_id: { type: 'string', description: 'UUID đầy đủ của người dùng' },
-      role: nullableEnum(USER_ROLES),
-      status: nullableEnum(USER_STATUSES),
       reason: { type: 'string', description: 'Lý do ngắn gọn bằng tiếng Việt' }
+    }, {
+      role: enumOf(USER_ROLES),
+      status: enumOf(USER_STATUSES)
     })
   },
   describe: async ({ user_id, role, status, reason }, admin) => {
@@ -213,10 +206,9 @@ const updateVesselStatus = {
   definition: {
     name: 'update_vessel_status',
     description: 'Đổi trạng thái hoạt động của 1 tàu. CẦN ADMIN XÁC NHẬN. Dùng id đầy đủ (UUID) lấy từ search_vessels.',
-    strict: true,
-    input_schema: objectSchema({
+    parametersJsonSchema: objectSchema({
       vessel_id: { type: 'string', description: 'UUID đầy đủ của tàu' },
-      status: { type: 'string', enum: VESSEL_STATUSES },
+      status: enumOf(VESSEL_STATUSES),
       reason: { type: 'string', description: 'Lý do ngắn gọn bằng tiếng Việt' }
     })
   },

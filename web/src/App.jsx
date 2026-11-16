@@ -4,8 +4,6 @@ import LoginScreen from './components/LoginScreen';
 import AdminDashboard from './components/AdminDashboard';
 import OrderManagement from './components/OrderManagement';
 import FleetManagement from './components/FleetManagement';
-import MobileAppSimulator from './components/MobileAppSimulator';
-import AIVisionPlayground from './components/AIVisionPlayground';
 import MaritimeMap from './components/MaritimeMap';
 import AnalyticsView from './components/AnalyticsView';
 import UserManagement from './components/UserManagement';
@@ -23,10 +21,9 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true); // đang kiểm tra token cũ lúc tải trang
   const [activeTab, setActiveTab] = useState('admin');
-  const [activeRole, setActiveRole] = useState('FISHERMAN'); // vai trò trong Mobile App Simulator
-  const [posts, setPosts] = useState(INITIAL_POSTS);
+  const [posts] = useState(INITIAL_POSTS);
   const [vessels] = useState(INITIAL_VESSELS);
-  const [orders, setOrders] = useState(INITIAL_ORDERS);
+  const [orders] = useState(INITIAL_ORDERS);
   const [offlineMode, setOfflineMode] = useState(false);
 
   // Nếu trình duyệt đã có JWT từ lần đăng nhập trước (localStorage), thử gọi
@@ -43,7 +40,6 @@ export default function App() {
         const user = buildUserFromBackend(backendUser);
         setCurrentUser(user);
         setActiveTab(user.defaultTab);
-        if (user.mobileRole) setActiveRole(user.mobileRole);
       } catch {
         // Token hết hạn/không hợp lệ -> xoá, quay lại màn đăng nhập
         logoutAccount();
@@ -65,7 +61,6 @@ export default function App() {
   const handleLogin = (user) => {
     setCurrentUser(user);
     setActiveTab(user.defaultTab);
-    if (user.mobileRole) setActiveRole(user.mobileRole);
   };
 
   const handleLogout = () => {
@@ -136,24 +131,6 @@ export default function App() {
           <FleetManagement />
         )}
 
-        {canViewActiveTab && activeTab === 'mobile' && (
-          <MobileAppSimulator
-            posts={posts}
-            setPosts={setPosts}
-            vessels={vessels}
-            orders={orders}
-            setOrders={setOrders}
-            offlineMode={offlineMode}
-            activeRole={activeRole}
-            setActiveRole={setActiveRole}
-            currentUser={currentUser}
-          />
-        )}
-
-        {canViewActiveTab && activeTab === 'ai-vision' && (
-          <AIVisionPlayground />
-        )}
-
         {canViewActiveTab && activeTab === 'sea-map' && (
           <MaritimeMap
             vessels={vessels}
@@ -162,8 +139,12 @@ export default function App() {
           />
         )}
 
-        {canViewActiveTab && activeTab === 'ai-assistant' && (
-          <AIAssistant />
+        {/* Luôn giữ Trợ Lý AI trong cây component (chỉ ẩn đi) để chuyển tab không
+            làm mất cuộc trò chuyện và câu hỏi đang chờ trả lời. */}
+        {canAccessTab(currentUser.role, 'ai-assistant') && (
+          <div hidden={activeTab !== 'ai-assistant'}>
+            <AIAssistant />
+          </div>
         )}
 
         {canViewActiveTab && activeTab === 'users' && (

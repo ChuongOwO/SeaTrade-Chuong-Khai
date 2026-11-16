@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, SendHorizontal, Check, X, RotateCcw, AlertTriangle } from 'lucide-react';
-import { askAgent, confirmAgentActions } from '../api/agent';
+import { askAgent, confirmAgentActions, fetchAgentConversation, resetAgentConversation } from '../api/agent';
 
 // Câu hỏi gợi ý — gắn với dữ liệu thật mà trợ lý tra cứu được
 const SUGGESTIONS = [
@@ -12,6 +12,15 @@ const SUGGESTIONS = [
 ];
 
 const DECISION_LABELS = { true: 'Đã duyệt', false: 'Đã từ chối' };
+
+// Quyết định đã lưu ở server -> { [actionId]: true | false }
+const readDecisions = (messages) =>
+  Object.fromEntries(
+    messages
+      .flatMap(message => message.actions || [])
+      .filter(action => typeof action.decision === 'boolean')
+      .map(action => [action.id, action.decision])
+  );
 
 function ActionCard({ action, decision, isBusy, onDecide }) {
   const isDecided = decision !== undefined;
@@ -57,13 +66,34 @@ export default function AIAssistant() {
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
   const [input, setInput] = useState('');
-  const [isBusy, setIsBusy] = useState(false);
+  // Bận ngay từ đầu: đang tải lại cuộc trò chuyện đã lưu
+  const [isBusy, setIsBusy] = useState(true);
+  const [isRestoring, setIsRestoring] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   // Quyết định của admin cho từng thao tác: { [actionId]: true | false }
   const [decisions, setDecisions] = useState({});
-  // 'mock' = back-end đang bật AI_AGENT_MOCK (chưa dùng Claude thật)
+  // 'mock' = back-end đang bật AI_AGENT_MOCK (chưa dùng Gemini thật)
   const [mode, setMode] = useState(null);
   const bottomRef = useRef(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+    fetchAgentConversation()
+      .then(saved => {
+        if (isCancelled) return;
+        setMessages(saved.messages);
+        setConversationId(saved.conversationId);
+        setDecisions(readDecisions(saved.messages));
+        setMode(saved.mode);
+      })
+      .catch(err => { if (!isCancelled) setErrorMsg(err.message); })
+      .finally(() => {
+        if (isCancelled) return;
+        setIsRestoring(false);
+        setIsBusy(false);
+      });
+    return () => { isCancelled = true; };
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -113,11 +143,19 @@ export default function AIAssistant() {
     runRequest(() => confirmAgentActions(conversationId, turnDecisions));
   };
 
-  const startNewConversation = () => {
-    setMessages([]);
-    setConversationId(null);
-    setDecisions({});
+  const startNewConversation = async () => {
+    setIsBusy(true);
     setErrorMsg('');
+    try {
+      await resetAgentConversation();
+      setMessages([]);
+      setConversationId(null);
+      setDecisions({});
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsBusy(false);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -134,7 +172,7 @@ export default function AIAssistant() {
           <h2 className="page-header-title flex items-center gap-2">
             Trợ Lý AI
             {mode === 'mock' && (
-              <span className="badge-sm badge-amber" title="Back-end đang bật AI_AGENT_MOCK: trả lời theo từ khoá, chưa dùng Claude">
+              <span className="badge-sm badge-amber" title="Back-end đang bật AI_AGENT_MOCK: trả lời theo từ khoá, chưa dùng Gemini">
                 Chế độ giả lập
               </span>
             )}
@@ -152,7 +190,9 @@ export default function AIAssistant() {
 
       <div className="glass-panel agent-panel">
         <div className="agent-thread" aria-live="polite">
-          {messages.length === 0 ? (
+          {isRestoring ? (
+            <p className="text-sm text-slate-500 pl-11">Đang tải cuộc trò chuyện...</p>
+          ) : messages.length === 0 ? (
             <div className="agent-empty">
               <Bot className="w-9 h-9 text-teal-600" />
               <p className="text-sm text-slate-600">Chọn một câu hỏi để bắt đầu, hoặc tự gõ yêu cầu ở ô bên dưới.</p>
@@ -176,7 +216,7 @@ export default function AIAssistant() {
             )
           )}
 
-          {isBusy && (
+          {isBusy && !isRestoring && (
             <p className="text-sm text-slate-500 flex items-center gap-2 pl-11">
               <span className="agent-typing" aria-hidden="true"><span /><span /><span /></span>
               Trợ lý đang tra cứu dữ liệu...
