@@ -1,8 +1,8 @@
 const crypto = require('crypto');
 
 // "Model giả lập" cho Trợ lý AI — bật bằng AI_AGENT_MOCK=true trong .env.
-// Dùng khi chưa có ANTHROPIC_API_KEY hoặc khi phát triển giao diện cho đỡ tốn
-// tiền. Có cùng giao diện client.beta.messages.create() như Anthropic SDK nên
+// Dùng khi chưa có GEMINI_API_KEY hoặc khi không muốn tốn hạn mức gọi model.
+// Có cùng giao diện generate(contents) và định dạng part như bản Gemini thật nên
 // đi qua ĐÚNG vòng lặp agent thật (agent.service.js): gọi tool thật trên DB
 // thật, tạo phiếu chờ duyệt thật. Chỉ khác: hiểu câu hỏi bằng từ khoá đơn giản
 // thay vì mô hình ngôn ngữ.
@@ -18,9 +18,9 @@ const hasAny = (text, keywords) => keywords.some(keyword => text.includes(keywor
 const formatVnd = (value) => `${Number(value).toLocaleString('vi-VN')} đ`;
 const shortId = (id) => id.slice(0, 8).toUpperCase();
 
-const textBlock = (text) => ({ type: 'text', text });
-const toolUse = (name, input) => ({ type: 'tool_use', id: `mock_${crypto.randomUUID()}`, name, input });
-const reply = (stop_reason, content) => ({ stop_reason, content });
+const textPart = (text) => ({ text });
+const functionCall = (name, args) => ({ functionCall: { id: `mock_${crypto.randomUUID()}`, name, args } });
+const reply = (...parts) => ({ parts, finishReason: 'STOP' });
 
 // ---------------------------- Hiểu câu hỏi ----------------------------
 
@@ -45,18 +45,18 @@ const planToolCall = (question) => {
   const text = normalize(question);
   const userAction = detectUserAction(text);
 
-  if (userAction) return toolUse('search_users', { keyword: userAction.phone, role: null, status: null });
+  if (userAction) return functionCall('search_users', { keyword: userAction.phone });
   if (hasAny(text, ['don hang', 'don nao', 'cac don', ' don '])) {
     // Nhắc đúng 1 trạng thái thì lọc ở tool; nhiều trạng thái thì lọc lúc tóm tắt
     const statuses = detectOrderStatuses(text);
-    return toolUse('search_orders', { status: statuses.length === 1 ? statuses[0] : null, keyword: null });
+    return functionCall('search_orders', statuses.length === 1 ? { status: statuses[0] } : {});
   }
-  if (hasAny(text, ['tau', 'gps'])) return toolUse('search_vessels', { status: null, keyword: null });
-  if (hasAny(text, ['cho', 'rao ban', 'gia', 'loai'])) return toolUse('search_market', { keyword: null });
+  if (hasAny(text, ['tau', 'gps'])) return functionCall('search_vessels', {});
+  if (hasAny(text, ['cho', 'rao ban', 'gia', 'loai'])) return functionCall('search_market', {});
   if (hasAny(text, ['tai khoan', 'nguoi dung', 'user'])) {
-    return toolUse('search_users', { keyword: null, role: null, status: text.includes('khoa') ? 'BANNED' : null });
+    return functionCall('search_users', text.includes('khoa') ? { status: 'BANNED' } : {});
   }
-  return toolUse('get_overview_stats', {});
+  return functionCall('get_overview_stats', {});
 };
 
 // --------------------------- Soạn câu trả lời ---------------------------
@@ -122,52 +122,43 @@ const SUMMARIZERS = {
 
 // ------------------------------- Vòng lặp -------------------------------
 
-const lastQuestion = (messages) =>
-  [...messages].reverse().find(m => m.role === 'user' && typeof m.content === 'string')?.content || '';
+const questionOf = (content) => (content.role === 'user' ? content.parts[0].text : undefined);
+
+const lastQuestion = (contents) => contents.map(questionOf).filter(Boolean).at(-1) || '';
 
 // Sau khi tìm được tài khoản: đề xuất đổi trạng thái (tool ghi -> phiếu chờ duyệt)
 const proposeUserAction = (result, userAction) => {
   const user = result.rows[0];
-  if (!user) return reply('end_turn', [textBlock(`Không tìm thấy tài khoản có SĐT ${userAction.phone}.`)]);
+  if (!user) return reply(textPart(`Không tìm thấy tài khoản có SĐT ${userAction.phone}.`));
   if (user.status === userAction.status) {
-    return reply('end_turn', [textBlock(`Tài khoản ${user.full_name} (${user.phone}) đã ở trạng thái ${user.status}, không cần đổi.`)]);
+    return reply(textPart(`Tài khoản ${user.full_name} (${user.phone}) đã ở trạng thái ${user.status}, không cần đổi.`));
   }
-  return reply('tool_use', [
-    textBlock(`Tìm thấy tài khoản ${user.full_name} (${user.phone}), vai trò ${user.role}, đang ${user.status}. Mình đề xuất thao tác sau:`),
-    toolUse('update_user', { user_id: user.id, role: null, status: userAction.status, reason: 'Theo yêu cầu của admin' })
-  ]);
+  return reply(
+    textPart(`Tìm thấy tài khoản ${user.full_name} (${user.phone}), vai trò ${user.role}, đang ${user.status}. Mình đề xuất thao tác sau:`),
+    functionCall('update_user', { user_id: user.id, status: userAction.status, reason: 'Theo yêu cầu của admin' })
+  );
 };
 
-const answerFromToolResult = (messages) => {
-  const results = messages.at(-1).content;
-  const toolUses = messages.at(-2).content.filter(block => block.type === 'tool_use');
-  const result = results[0];
-  const call = toolUses.find(block => block.id === result.tool_use_id);
-  const payload = JSON.parse(result.content);
+const answerFromToolResult = (contents) => {
+  const { name, response: payload } = contents.at(-1).parts[0].functionResponse;
 
-  if (result.is_error) return reply('end_turn', [textBlock(`Không thực hiện được: ${payload.error}`)]);
-  if (call.name === 'update_user') {
-    return reply('end_turn', [textBlock(payload.done
+  if (payload.error) return reply(textPart(`Không thực hiện được: ${payload.error}`));
+  if (name === 'update_user') {
+    return reply(textPart(payload.done
       ? `Đã cập nhật tài khoản ${payload.user.full_name}: trạng thái hiện tại ${payload.user.status}.`
-      : 'Đã huỷ thao tác theo quyết định của bạn, dữ liệu không thay đổi.')]);
+      : 'Đã huỷ thao tác theo quyết định của bạn, dữ liệu không thay đổi.'));
   }
 
-  const question = lastQuestion(messages);
+  const question = lastQuestion(contents);
   const userAction = detectUserAction(normalize(question));
-  if (call.name === 'search_users' && userAction) return proposeUserAction(payload, userAction);
-  return reply('end_turn', [textBlock(SUMMARIZERS[call.name](payload, question))]);
+  if (name === 'search_users' && userAction) return proposeUserAction(payload, userAction);
+  return reply(textPart(SUMMARIZERS[name](payload, question)));
 };
 
 const createMockClient = () => ({
-  beta: {
-    messages: {
-      create: async ({ messages }) => {
-        const last = messages.at(-1);
-        return typeof last.content === 'string'
-          ? reply('tool_use', [planToolCall(last.content)])
-          : answerFromToolResult(messages);
-      }
-    }
+  generate: async (contents) => {
+    const question = questionOf(contents.at(-1));
+    return question ? reply(planToolCall(question)) : answerFromToolResult(contents);
   }
 });
 

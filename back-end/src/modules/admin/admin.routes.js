@@ -126,4 +126,27 @@ router.post('/agent/chat', validate(agentChatSchema), agentController.chat);
  */
 router.post('/agent/confirm', validate(agentConfirmSchema), agentController.confirm);
 
+/**
+ * @swagger
+ * /api/admin/agent/conversation:
+ *   get:
+ *     summary: Cuộc trò chuyện đang mở với Trợ lý AI của admin hiện tại (ADMIN)
+ *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "{ conversationId, mode, messages: [{ role, text, actions? }] }"
+ *   delete:
+ *     summary: Xoá cuộc trò chuyện đang mở để bắt đầu cuộc mới (ADMIN)
+ *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "{ conversationId: null }"
+ */
+router.get('/agent/conversation', agentController.getCurrent);
+router.delete('/agent/conversation', agentController.reset);
+
 module.exports = router;
