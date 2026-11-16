@@ -41,6 +41,9 @@ __pycache__/
 package-lock.json
 yarn.lock
 
+# Flyway CLI do back-end/scripts/flyway.js tự tải về khi chạy npm run db:*
+.flyway-cli/
+
 # ---------------------------------------------
 # Mobile & Expo specifics
 # ---------------------------------------------
