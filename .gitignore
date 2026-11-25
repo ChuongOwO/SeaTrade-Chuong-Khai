@@ -8,6 +8,7 @@
 !/test/
 !/web/
 !/database/
+!/.github/
 
 # Ngoại trừ các file tài liệu và cấu hình gốc
 # 3. Ngoại trừ các file tài liệu và cấu hình gốc
