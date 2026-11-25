@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -62,9 +62,12 @@ export default function LoginScreen({ navigation }) {
         style={styles.content}
       >
         <View style={styles.headerContainer}>
-          <View style={styles.logoCircle}>
-            <Ionicons name="boat" size={48} color={colors.textOnPrimary} />
-          </View>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+            accessibilityRole="image"
+            accessibilityLabel="Logo SeaTrade"
+          />
           <Text style={styles.title}>SeaTrade AI</Text>
           <Text style={styles.subtitle}>Kết nối Hàng hải & Giao thương</Text>
         </View>
@@ -144,19 +147,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 48,
   },
-  logoCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+  logo: {
+    width: 112,
+    height: 112,
     marginBottom: 16,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    elevation: 8,
   },
   title: {
     fontSize: 28,
@@ -168,8 +162,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textMuted,
   },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#0f172a', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#64748b' },
   formContainer: {
     backgroundColor: colors.card,
     padding: 24,
