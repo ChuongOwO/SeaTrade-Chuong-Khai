@@ -5,11 +5,11 @@ import {
   Zap,
   Phone
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, LayersControl, LayerGroup, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { fetchVesselsLocations } from '../api/vessels';
-import { MAP_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_TILE_SUBDOMAINS, MAP_TILE_MAX_ZOOM } from '../config/mapTiles';
+import { MAP_BASE_LAYERS, MAP_SEAMARK_OVERLAY } from '../config/mapTiles';
 
 const fishingIcon = new L.DivIcon({
   html: `<div style="background-color: #0ea5e9; border: 2px solid #ffffff; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
@@ -37,7 +37,7 @@ const mapApiVessel = (v) => ({
   id: v.vessel_id,
   code: v.vessel_id ? String(v.vessel_id).slice(0, 8).toUpperCase() : 'N/A',
   name: v.vessel_name,
-  type: v.vessel_type === 'COLLECTION' ? 'collector' : 'fishing',
+  type: v.vessel_type === 'COLLECTOR' ? 'collector' : 'fishing',
   lat: parseFloat(v.latitude),
   lng: parseFloat(v.longitude),
   speedKnots: v.speed ? parseFloat(v.speed) : 0,
@@ -48,6 +48,16 @@ const mapApiVessel = (v) => ({
   homePort: null,
   batteryPercent: null,
 });
+
+// "vừa xong", "3 phút trước"... từ mốc thời gian server ghi nhận vị trí
+const formatLastSeen = (iso) => {
+  if (!iso) return 'Chưa rõ';
+  const diffSec = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (diffSec < 60) return 'Vừa xong';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} giờ trước`;
+  return `${Math.floor(diffSec / 86400)} ngày trước`;
+};
 
 export default function MaritimeMap({ vessels, posts, orders }) {
   // Bắt đầu bằng dữ liệu mẫu (prop `vessels`) để bản đồ không trống trong lúc
@@ -200,14 +210,32 @@ export default function MaritimeMap({ vessels, posts, orders }) {
               zoom={9}
               style={{ width: '100%', height: '100%' }}
             >
-              {/* Nguồn tile lấy từ config/mapTiles.js — đổi nguồn bản đồ (VD: khi có
-                  API key CartoDB) chỉ cần sửa file đó, không cần sửa ở đây. */}
-              <TileLayer
-                attribution={MAP_TILE_ATTRIBUTION}
-                url={MAP_TILE_URL}
-                maxZoom={MAP_TILE_MAX_ZOOM}
-                {...(MAP_TILE_SUBDOMAINS ? { subdomains: MAP_TILE_SUBDOMAINS } : {})}
-              />
+              {/* Các lớp nền + lớp phủ lấy từ config/mapTiles.js — thêm/đổi lớp chỉ cần sửa file đó.
+                  Nút chọn lớp nằm ở góc trên bên phải bản đồ. */}
+              <LayersControl position="topright">
+                {MAP_BASE_LAYERS.map((layer, index) => (
+                  <LayersControl.BaseLayer key={layer.id} name={layer.name} checked={index === 0}>
+                    <LayerGroup>
+                      {layer.tiles.map((tile) => (
+                        <TileLayer
+                          key={tile.url}
+                          url={tile.url}
+                          attribution={tile.attribution}
+                          maxZoom={tile.maxZoom}
+                          {...(tile.maxNativeZoom ? { maxNativeZoom: tile.maxNativeZoom } : {})}
+                        />
+                      ))}
+                    </LayerGroup>
+                  </LayersControl.BaseLayer>
+                ))}
+                <LayersControl.Overlay name={MAP_SEAMARK_OVERLAY.name}>
+                  <TileLayer
+                    url={MAP_SEAMARK_OVERLAY.url}
+                    attribution={MAP_SEAMARK_OVERLAY.attribution}
+                    maxZoom={MAP_SEAMARK_OVERLAY.maxZoom}
+                  />
+                </LayersControl.Overlay>
+              </LayersControl>
 
               {filteredVessels.map((vessel) => (
                 <Marker
@@ -226,8 +254,9 @@ export default function MaritimeMap({ vessels, posts, orders }) {
                   }}
                 >
                   <Popup>
-                    <strong>{vessel?.code || 'N/A'}</strong><br />
+                    <strong>{vessel?.name || vessel?.code || 'N/A'}</strong> ({vessel?.code || 'N/A'})<br />
                     Tốc độ: {vessel?.speedKnots || 0} knots<br />
+                    Cập nhật: {formatLastSeen(vessel?.lastSeen)}<br />
                     Lat: {vessel?.lat?.toFixed(4) || '0.0000'}<br />
                     Lng: {vessel?.lng?.toFixed(4) || '0.0000'}
                   </Popup>
