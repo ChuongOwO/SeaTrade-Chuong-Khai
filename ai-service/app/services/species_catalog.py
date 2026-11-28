@@ -56,6 +56,8 @@ SPECIES_INFO = {
     "cua": _species("Cua Biển", "Cua", "cua", 350000),
     "ca_bac_ma": _species("Cá Bạc Má", None, "ca_bac_ma", 60000),
     "ca_chim_den": _species("Cá Chim Đen", None, "ca_chim_den", 220000),
+    # Chưa có nguồn giá đáng tin cậy: dùng giá mặc định, cần xác minh trước khi đưa vào báo cáo.
+    "ca_chim_trang": _species("Cá Chim Trắng", None, "ca_chim_trang", DEFAULT_BASE_PRICE),
     # ----------------------------- Lớp biến thể ----------------------------
     "tom_hum_bong": _species("Tôm Hùm Bông", "Tôm", "tom_hum", 1600000),
     "tom_hum_xanh": _species("Tôm Hùm Xanh", "Tôm", "tom_hum", 1000000),
