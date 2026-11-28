@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+training/
+tests/
+yolov8n.pt
+.git
+# Model thử nghiệm (seafood_model_v4_bong.pt, seafood_model_v5.pt...) không đóng vào image
+ml-models/seafood_model_v*.pt
