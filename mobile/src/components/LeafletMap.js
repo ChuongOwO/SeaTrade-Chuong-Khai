@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { MAP_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_TILE_SUBDOMAINS, MAP_TILE_MAX_ZOOM } from '../config/mapTiles';
+import { MAP_BASE_LAYERS, MAP_SEAMARK_OVERLAY } from '../config/mapTiles';
 
 /**
  * LeafletMap: Bản đồ OSM hoàn chỉnh dùng Leaflet.js bên trong WebView (CDN).
@@ -79,6 +79,11 @@ function latDeltaToZoom(latDelta) {
   return Math.min(19, Math.max(1, Math.round(Math.log2(360 / latDelta)) - 1));
 }
 
+// Nhúng JSON vào thẻ <script> an toàn: tránh chuỗi "</a>" / "</script>" trong attribution cắt ngang script.
+function safeJson(value) {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
 function buildHtml(lat, lng, zoom) {
   return `<!DOCTYPE html>
 <html>
@@ -96,6 +101,7 @@ function buildHtml(lat, lng, zoom) {
   .dot-trader    { background:#f59e0b; }
   .dot-virtual   { background:#e11d48; }
   .leaflet-control-attribution { font-size:10px; pointer-events:none; }
+  .leaflet-control-layers { font-size:13px; }
 </style>
 </head>
 <body>
@@ -104,12 +110,21 @@ function buildHtml(lat, lng, zoom) {
 var map = L.map('map', { zoomControl: true }).setView([${lat}, ${lng}], ${zoom});
 window._map = map;
 
-// Nguồn tile lấy từ config/mapTiles.js — đổi nguồn bản đồ chỉ cần sửa file đó.
-L.tileLayer('${MAP_TILE_URL}', {
-  ${MAP_TILE_SUBDOMAINS ? `subdomains: '${MAP_TILE_SUBDOMAINS}',` : ''}
-  maxZoom: ${MAP_TILE_MAX_ZOOM},
-  attribution: '${MAP_TILE_ATTRIBUTION}'
-}).addTo(map);
+// Các lớp nền (Đường phố / Vệ tinh / Hải đồ) + lớp phủ ký hiệu hàng hải lấy từ
+// config/mapTiles.js — thêm/đổi lớp chỉ cần sửa file đó. Nút chọn lớp ở góc trên bên phải.
+var BASE_LAYERS = ${safeJson(MAP_BASE_LAYERS)};
+var SEAMARK = ${safeJson(MAP_SEAMARK_OVERLAY)};
+var baseMaps = {};
+BASE_LAYERS.forEach(function(layer, index) {
+  var group = L.layerGroup(layer.tiles.map(function(t) {
+    return L.tileLayer(t.url, { maxZoom: t.maxZoom, maxNativeZoom: t.maxNativeZoom, attribution: t.attribution });
+  }));
+  baseMaps[layer.name] = group;
+  if (index === 0) group.addTo(map);
+});
+var overlayMaps = {};
+overlayMaps[SEAMARK.name] = L.tileLayer(SEAMARK.url, { maxZoom: SEAMARK.maxZoom, attribution: SEAMARK.attribution });
+L.control.layers(baseMaps, overlayMaps, { position: 'topright', collapsed: true }).addTo(map);
 
 map.on('click', function() {
   if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('MAP_PRESS');

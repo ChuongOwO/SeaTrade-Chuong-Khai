@@ -7,8 +7,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { API_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchMyVessel, postVesselLocation } from '../api/vesselsApi';
 
 const SEA_CENTER = { latitude: 10.3240, longitude: 107.1240 };
+// Gửi vị trí tàu của mình lên server tối đa 1 lần / 5 giây (watchPosition cập nhật dày hơn nhiều).
+const LOCATION_SEND_INTERVAL_MS = 5000;
+const MS_TO_KNOTS = 1.94384; // expo-location trả tốc độ m/s, server lưu hải lý/giờ
 
 export default function HomeScreen({ route, navigation }) {
   const { colors, isDarkMode } = useTheme();
@@ -18,7 +22,11 @@ export default function HomeScreen({ route, navigation }) {
   const [polyline, setPolyline] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
   const [locationSubscription, setLocationSubscription] = useState(null);
-  const [demoOffset, setDemoOffset] = useState(null);
+  // Độ lệch dời tọa độ GPS thật sang vùng biển demo; dùng ref để callback GPS đọc/ghi
+  // trực tiếp, không phải đặt side-effect (gọi API) bên trong hàm cập nhật state.
+  const demoOffsetRef = useRef(null);
+  const myVesselIdRef = useRef(null);
+  const lastSentAtRef = useRef(0);
 
   const [selectedVessel, setSelectedVessel] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
@@ -93,9 +101,33 @@ export default function HomeScreen({ route, navigation }) {
     }
   };
 
+  // Lấy id tàu của user (nếu có) để biết gửi GPS cho tàu nào. 404 = chưa có tàu -> null.
+  const loadMyVesselId = async () => {
+    try {
+      const vessel = await fetchMyVessel();
+      myVesselIdRef.current = vessel?.vessel_id || null;
+    } catch (e) {
+      console.log('Lỗi lấy tàu của tôi:', e);
+    }
+  };
+
+  // Gửi vị trí (đã dời ra biển demo) lên server để web admin và người dùng khác thấy tàu di chuyển.
+  const sendMyLocation = (latitude, longitude, coords) => {
+    const vesselId = myVesselIdRef.current;
+    const now = Date.now();
+    if (!vesselId || now - lastSentAtRef.current < LOCATION_SEND_INTERVAL_MS) return;
+    lastSentAtRef.current = now;
+
+    const speedKnots = coords.speed > 0 ? Math.round(coords.speed * MS_TO_KNOTS * 10) / 10 : 0;
+    const heading = coords.heading >= 0 && coords.heading <= 360 ? Math.round(coords.heading) : 0;
+    postVesselLocation(vesselId, { latitude, longitude, speed: speedKnots, heading })
+      .catch((e) => console.log('Lỗi gửi vị trí tàu:', e.message));
+  };
+
   useEffect(() => {
     fetchVesselsLocations();
     checkFishermanVessel();
+    loadMyVesselId();
     // Refresh mỗi 10s
     const interval = setInterval(fetchVesselsLocations, 10000);
     return () => clearInterval(interval);
@@ -130,6 +162,9 @@ export default function HomeScreen({ route, navigation }) {
         return;
       }
 
+      // Làm mới id tàu phòng khi user vừa đăng ký tàu sau lúc mở màn hình này
+      await loadMyVesselId();
+
       if (locationSubscription) locationSubscription.remove();
 
       const sub = await Location.watchPositionAsync(
@@ -138,24 +173,21 @@ export default function HomeScreen({ route, navigation }) {
           const realLat = currentPos.coords.latitude;
           const realLng = currentPos.coords.longitude;
 
-          setDemoOffset((currentOffset) => {
-            let offsetToUse = currentOffset;
-            if (!offsetToUse) {
-              offsetToUse = { lat: SEA_CENTER.latitude - realLat, lng: SEA_CENTER.longitude - realLng };
-            }
+          if (!demoOffsetRef.current) {
+            demoOffsetRef.current = { lat: SEA_CENTER.latitude - realLat, lng: SEA_CENTER.longitude - realLng };
+          }
+          const fakeLat = realLat + demoOffsetRef.current.lat;
+          const fakeLng = realLng + demoOffsetRef.current.lng;
 
-            const fakeLat = realLat + offsetToUse.lat;
-            const fakeLng = realLng + offsetToUse.lng;
+          setLocation({ latitude: fakeLat, longitude: fakeLng });
 
-            setLocation({ latitude: fakeLat, longitude: fakeLng });
+          if (mapRef.current) {
+            mapRef.current.animateToRegion({
+              latitude: fakeLat, longitude: fakeLng, latitudeDelta: 0.2, longitudeDelta: 0.2,
+            });
+          }
 
-            if (mapRef.current) {
-              mapRef.current.animateToRegion({
-                latitude: fakeLat, longitude: fakeLng, latitudeDelta: 0.2, longitudeDelta: 0.2,
-              });
-            }
-            return offsetToUse;
-          });
+          sendMyLocation(fakeLat, fakeLng, currentPos.coords);
           setIsLocating(false);
         }
       );
